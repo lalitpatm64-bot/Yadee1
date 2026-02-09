@@ -1,6 +1,8 @@
 export interface Medication {
   id: string;
-  name: string;
+  name: string; // Scientific name
+  commonName?: string; // User-friendly name e.g. "ยาเบาหวาน"
+  appearance?: string; // Description e.g. "เม็ดสีขาว"
   dosage: string;
   time: string; // e.g., "08:00"
   instruction: string; // e.g., "Take after meal"

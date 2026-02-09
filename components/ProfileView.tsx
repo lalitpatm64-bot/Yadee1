@@ -1,18 +1,21 @@
 import React, { useState, useRef } from 'react';
-import { User, Plus, Pill, Clock, FileText, Activity, Save, BellRing, Mic, Square, Play, Trash2 } from 'lucide-react';
+import { User, Plus, Pill, Clock, FileText, Activity, Save, BellRing, Mic, Square, Play, Trash2, Tag, Eye, Presentation } from 'lucide-react';
 import { Medication } from '../types';
 import { MOCK_USER } from '../constants';
 
 interface Props {
   onAddMedication: (med: Medication) => void;
-  onSimulateAlert?: () => void;
+  onSimulateAlert?: () => void; // Keeping for backward compatibility if needed
+  onSimulateStage?: (stage: number) => void; // New prop for specific stage simulation
   onSaveVoice?: (blobUrl: string | null) => void;
 }
 
-const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert, onSaveVoice }) => {
+const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateStage, onSaveVoice }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    commonName: '',
+    appearance: '',
     dosage: '',
     time: '',
     instruction: ''
@@ -42,6 +45,8 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert, onSave
     const newMed: Medication = {
       id: Date.now().toString(),
       name: formData.name,
+      commonName: formData.commonName || undefined,
+      appearance: formData.appearance || undefined,
       dosage: formData.dosage || 'ตามแพทย์สั่ง',
       time: formData.time,
       instruction: formData.instruction || 'ตามแพทย์สั่ง',
@@ -53,7 +58,7 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert, onSave
 
     onAddMedication(newMed);
     
-    setFormData({ name: '', dosage: '', time: '', instruction: '' });
+    setFormData({ name: '', commonName: '', appearance: '', dosage: '', time: '', instruction: '' });
     setRecordedUrlMed(null);
     setIsFormVisible(false);
   };
@@ -250,15 +255,41 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert, onSave
 
             <div className="space-y-2">
               <label className="text-slate-700 font-bold flex items-center text-lg">
-                <Pill size={20} className="mr-2 text-pink-500"/> ชื่อยา
+                <Pill size={20} className="mr-2 text-pink-500"/> ชื่อยา (ภาษาอังกฤษ/หน้าซอง)
               </label>
               <input 
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="เช่น ยาแก้แพ้, Amlodipine"
+                placeholder="เช่น Amlodipine"
                 className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-pink-500 outline-none text-lg"
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-slate-700 font-bold flex items-center text-lg">
+                <Tag size={20} className="mr-2 text-pink-500"/> ชื่อเรียกง่ายๆ (ภาษาไทย)
+              </label>
+              <input 
+                name="commonName"
+                value={formData.commonName}
+                onChange={handleChange}
+                placeholder="เช่น ยาความดัน, ยาแก้แพ้"
+                className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-pink-500 outline-none text-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-slate-700 font-bold flex items-center text-lg">
+                <Eye size={20} className="mr-2 text-pink-500"/> ลักษณะยา
+              </label>
+              <input 
+                name="appearance"
+                value={formData.appearance}
+                onChange={handleChange}
+                placeholder="เช่น เม็ดสีขาวกลม, แคปซูลสีเขียว"
+                className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-pink-500 outline-none text-lg"
               />
             </div>
 
@@ -362,16 +393,46 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert, onSave
       </div>
 
       {/* Test / Simulation Section */}
-      {onSimulateAlert && (
+      {onSimulateStage && (
           <div className="pt-6 border-t border-slate-200">
-             <h3 className="text-slate-400 font-bold mb-4 text-center text-sm uppercase tracking-wide">ส่วนทดสอบระบบ (Testing)</h3>
-             <button 
-                onClick={onSimulateAlert}
-                className="w-full bg-slate-100 text-slate-600 p-4 rounded-2xl flex items-center justify-center font-bold text-lg hover:bg-slate-200 transition-colors border-2 border-dashed border-slate-300"
-             >
-                <BellRing className="mr-2" size={24} />
-                ทดลองระบบแจ้งเตือน (จำลองลืมกินยา)
-             </button>
+             <div className="flex items-center justify-center mb-4">
+                 <Presentation className="text-slate-400 mr-2" size={20} />
+                 <h3 className="text-slate-400 font-bold text-sm uppercase tracking-wide">ส่วนทดสอบระบบ (Demo Mode)</h3>
+             </div>
+             
+             <div className="grid grid-cols-2 gap-3">
+                 <button 
+                    onClick={() => onSimulateStage(0)}
+                    className="p-3 bg-blue-100 text-blue-700 rounded-xl font-bold shadow-sm active:scale-95 flex flex-col items-center"
+                 >
+                    <Clock size={24} className="mb-1"/>
+                    <span>🔵 เตือนล่วงหน้า</span>
+                 </button>
+
+                 <button 
+                    onClick={() => onSimulateStage(1)}
+                    className="p-3 bg-yellow-100 text-yellow-700 rounded-xl font-bold shadow-sm active:scale-95 flex flex-col items-center"
+                 >
+                    <BellRing size={24} className="mb-1"/>
+                    <span>🟡 เลย 15 นาที</span>
+                 </button>
+
+                 <button 
+                    onClick={() => onSimulateStage(2)}
+                    className="p-3 bg-orange-100 text-orange-700 rounded-xl font-bold shadow-sm active:scale-95 flex flex-col items-center"
+                 >
+                    <BellRing size={24} className="mb-1 animate-pulse"/>
+                    <span>🟠 เลย 30 นาที</span>
+                 </button>
+
+                 <button 
+                    onClick={() => onSimulateStage(3)}
+                    className="p-3 bg-red-100 text-red-700 rounded-xl font-bold shadow-sm active:scale-95 flex flex-col items-center"
+                 >
+                    <BellRing size={24} className="mb-1 animate-bounce"/>
+                    <span>🔴 ฉุกเฉิน (1 ชม.)</span>
+                 </button>
+             </div>
           </div>
       )}
     </div>

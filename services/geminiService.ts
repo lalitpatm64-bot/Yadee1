@@ -1,6 +1,6 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from '../constants';
-import { ChatMessage, UserProfile } from '../types';
+import { ChatMessage, UserProfile, Medication, VitalSigns } from '../types';
 
 // Initialize Gemini
 // NOTE: We assume process.env.API_KEY is available.
@@ -159,5 +159,47 @@ export const analyzeFaceHealth = async (base64Image: string): Promise<string> =>
   } catch (error) {
     console.error("Gemini Face Error:", error);
     return "{}";
+  }
+};
+
+export const generateDailyReport = async (
+  user: UserProfile,
+  medications: Medication[],
+  vitals: VitalSigns,
+  mood: string
+): Promise<string> => {
+  try {
+    const modelId = 'gemini-3-flash-preview';
+    
+    const takenCount = medications.filter(m => m.taken).length;
+    const totalCount = medications.length;
+    
+    const prompt = `
+      Role: A loving elderly grandmother/grandfather (Thai).
+      Task: Write a short, warm, and cute message to send to children/grandchildren via LINE application.
+      
+      Context Data:
+      - Name: ${user.name}
+      - Meds Taken: ${takenCount}/${totalCount}
+      - Blood Pressure: ${vitals.systolic}/${vitals.diastolic}
+      - Sugar: ${vitals.sugar}
+      - Mood today: ${mood}
+      
+      Requirements:
+      - Tone: Loving, cheerful, use emojis (😊, ❤️, 💊).
+      - Content: Summarize health briefly. If meds are complete, say so proudly. If vitals are good, brag a little.
+      - Ending: Say "I love you" or "Don't worry about me".
+      - Length: Short, fit for a chat bubble (2-3 sentences).
+    `;
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: modelId,
+      contents: prompt,
+    });
+
+    return response.text || "แม่สบายดีจ้ะ กินยาครบแล้ว รักลูกนะ";
+  } catch (error) {
+    console.error("Gemini Report Error:", error);
+    return "แม่สบายดีจ้ะ กินยาครบแล้ว รักลูกนะ";
   }
 };

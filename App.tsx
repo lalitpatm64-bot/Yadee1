@@ -54,26 +54,41 @@ const App: React.FC = () => {
     alert(`เพิ่มยา "${newMed.name}" เรียบร้อยแล้วค่ะ`);
   };
 
-  // Logic to simulate a missed dose for demonstration/testing
-  const simulateMissedDose = () => {
+  // Logic to simulate specific alert stages
+  const simulateSpecificAlert = (stage: number) => {
     const now = new Date();
-    // Set time to 16 minutes ago to trigger Stage 1 (15 min) alert immediately
-    const pastTime = new Date(now.getTime() - 16 * 60000); 
-    const timeString = `${pastTime.getHours().toString().padStart(2, '0')}:${pastTime.getMinutes().toString().padStart(2, '0')}`;
+    let minutesOffset = 0;
+
+    // SafetyNet logic relies on: CurrentTime - MedTime
+    // Stage 0: Want diff = -5 (between -10 and 0). So MedTime = Now + 5 min.
+    // Stage 1: Want diff = +16 (>= 15). So MedTime = Now - 16 min.
+    // Stage 2: Want diff = +31 (>= 30). So MedTime = Now - 31 min.
+    // Stage 3: Want diff = +61 (>= 60). So MedTime = Now - 61 min.
+
+    if (stage === 0) minutesOffset = 5;
+    else if (stage === 1) minutesOffset = -16;
+    else if (stage === 2) minutesOffset = -31;
+    else if (stage === 3) minutesOffset = -61;
+
+    const targetTime = new Date(now.getTime() + minutesOffset * 60000);
+    const timeString = `${targetTime.getHours().toString().padStart(2, '0')}:${targetTime.getMinutes().toString().padStart(2, '0')}`;
 
     setMedications(prev => {
         if (prev.length === 0) return prev;
-        // Modify the first medication to be untaken and past due
         const newMeds = [...prev];
+        // Use the first medication for simulation
         newMeds[0] = {
             ...newMeds[0],
-            taken: false,
+            taken: false, // Ensure it's not taken
             time: timeString,
-            alertLevel: 0 // Reset level so SafetyNet picks it up as new Stage 1
+            alertLevel: 0 // Reset level so logic picks it up as fresh
         };
         return newMeds;
     });
-    alert("ระบบกำลังจำลองสถานการณ์: ลืมทานยาเมื่อ 16 นาทีที่แล้ว... (รอสักครู่ระบบจะแจ้งเตือน)");
+
+    // Provide feedback
+    const stageNames = ["เตรียมตัว (-10 นาที)", "เลย 15 นาที", "เลย 30 นาที", "ฉุกเฉิน (1 ชม.)"];
+    alert(`จำลองสถานะ: ${stageNames[stage]} เรียบร้อยแล้ว \n(ระบบจะแจ้งเตือนในไม่กี่วินาที)`);
   };
 
   const renderView = () => {
@@ -101,7 +116,7 @@ const App: React.FC = () => {
         return (
           <ProfileView 
             onAddMedication={handleAddMedication} 
-            onSimulateAlert={simulateMissedDose}
+            onSimulateStage={simulateSpecificAlert}
             onSaveVoice={setCustomVoiceUrl}
           />
         );
