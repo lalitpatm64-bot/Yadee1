@@ -1,11 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, X, Loader2 } from 'lucide-react';
-import { analyzeMedicalImage } from '../services/geminiService';
+import { Camera, Upload, X, Loader2, Pill, Utensils } from 'lucide-react';
+import { analyzeMedicalImage, analyzeFoodImage } from '../services/geminiService';
+import { MOCK_USER } from '../constants';
+
+type ScanMode = 'medication' | 'food';
 
 const ImageUploader: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<ScanMode>('medication');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -14,11 +18,9 @@ const ImageUploader: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        // Strip prefix for Gemini API if necessary, but usually inlineData accepts base64 part.
-        // The API wants raw base64 usually, so let's strip the data URL prefix.
         const base64Data = base64String.split(',')[1];
         setImage(base64Data);
-        setAnalysis(null); // Reset previous analysis
+        setAnalysis(null);
       };
       reader.readAsDataURL(file);
     }
@@ -27,7 +29,14 @@ const ImageUploader: React.FC = () => {
   const handleAnalyze = async () => {
     if (!image) return;
     setLoading(true);
-    const result = await analyzeMedicalImage(image);
+    let result;
+    
+    if (mode === 'medication') {
+        result = await analyzeMedicalImage(image);
+    } else {
+        result = await analyzeFoodImage(image, MOCK_USER);
+    }
+    
     setAnalysis(result);
     setLoading(false);
   };
@@ -42,18 +51,49 @@ const ImageUploader: React.FC = () => {
 
   return (
     <div className="p-4 flex flex-col items-center space-y-6 pb-24 h-full overflow-y-auto">
-      <h2 className="text-2xl font-bold text-teal-800 text-center">ถ่ายรูปยาเพื่อตรวจสอบ</h2>
-      <p className="text-slate-500 text-center text-lg">
-        ถ่ายรูปเม็ดยา หรือ ฉลากยา <br/>เพื่อให้ระบบช่วยดูให้นะคะ
-      </p>
+      
+      {/* Mode Switcher */}
+      <div className="flex bg-slate-200 p-1 rounded-2xl w-full max-w-md">
+        <button 
+            onClick={() => { setMode('medication'); clearImage(); }}
+            className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
+                mode === 'medication' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:bg-slate-300/50'
+            }`}
+        >
+            <Pill className="mr-2" size={20} />
+            สแกนยา
+        </button>
+        <button 
+            onClick={() => { setMode('food'); clearImage(); }}
+            className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
+                mode === 'food' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-slate-300/50'
+            }`}
+        >
+            <Utensils className="mr-2" size={20} />
+            สแกนอาหาร
+        </button>
+      </div>
+
+      <div className="text-center">
+        <h2 className={`text-2xl font-bold ${mode === 'medication' ? 'text-teal-800' : 'text-orange-700'}`}>
+            {mode === 'medication' ? 'ตรวจสอบยา' : 'ตรวจสอบอาหาร'}
+        </h2>
+        <p className="text-slate-500 text-lg mt-1">
+            {mode === 'medication' 
+                ? 'ถ่ายรูปยาเพื่อให้ AI ช่วยบอกวิธีใช้' 
+                : 'ถ่ายรูปอาหารเพื่อดูว่า "ทานได้ไหม"'}
+        </p>
+      </div>
 
       {/* Image Preview Area */}
-      <div className="w-full max-w-md aspect-square bg-slate-100 rounded-3xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
+      <div className={`w-full max-w-md aspect-square bg-slate-100 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden shadow-inner ${
+          mode === 'medication' ? 'border-teal-300' : 'border-orange-300'
+      }`}>
         {image ? (
           <>
             <img 
               src={`data:image/jpeg;base64,${image}`} 
-              alt="Uploaded Med" 
+              alt="Uploaded" 
               className="w-full h-full object-cover" 
             />
             <button 
@@ -65,8 +105,8 @@ const ImageUploader: React.FC = () => {
           </>
         ) : (
           <div className="text-center p-6">
-            <Camera size={64} className="mx-auto text-slate-300 mb-2" />
-            <p className="text-slate-400">แตะด้านล่างเพื่อถ่ายรูป</p>
+            <Camera size={64} className={`mx-auto mb-2 ${mode === 'medication' ? 'text-teal-200' : 'text-orange-200'}`} />
+            <p className="text-slate-400">แตะเพื่อถ่ายรูป</p>
           </div>
         )}
       </div>
@@ -74,9 +114,11 @@ const ImageUploader: React.FC = () => {
       {/* Controls */}
       <div className="w-full max-w-md space-y-4">
         {!image ? (
-            <label className="flex items-center justify-center w-full bg-teal-600 text-white py-4 rounded-2xl text-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-transform">
+            <label className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-transform text-white ${
+                mode === 'medication' ? 'bg-teal-600' : 'bg-orange-500'
+            }`}>
                 <Camera className="mr-2" size={28} />
-                ถ่ายรูป / เลือกรูป
+                ถ่ายรูป
                 <input 
                     type="file" 
                     accept="image/*" 
@@ -89,8 +131,8 @@ const ImageUploader: React.FC = () => {
             <button 
                 onClick={handleAnalyze} 
                 disabled={loading}
-                className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg transition-all ${
-                    loading ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-teal-600 text-white active:scale-95'
+                className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg transition-all text-white active:scale-95 ${
+                    loading ? 'bg-slate-300 cursor-not-allowed' : (mode === 'medication' ? 'bg-teal-600' : 'bg-orange-500')
                 }`}
             >
                 {loading ? (
@@ -101,7 +143,7 @@ const ImageUploader: React.FC = () => {
                 ) : (
                     <>
                         <Upload className="mr-2" size={28} />
-                        ตรวจสอบยานี้
+                        วิเคราะห์
                     </>
                 )}
             </button>
@@ -110,13 +152,17 @@ const ImageUploader: React.FC = () => {
 
       {/* Result Area */}
       {analysis && (
-        <div className="w-full max-w-md bg-white p-6 rounded-3xl shadow-lg border border-teal-100 animate-fade-in">
-          <h3 className="text-xl font-bold text-teal-800 mb-2">ผลการวิเคราะห์:</h3>
+        <div className={`w-full max-w-md bg-white p-6 rounded-3xl shadow-lg border animate-fade-in ${
+            mode === 'medication' ? 'border-teal-100' : 'border-orange-100'
+        }`}>
+          <h3 className={`text-xl font-bold mb-2 ${mode === 'medication' ? 'text-teal-800' : 'text-orange-800'}`}>
+            ผลการวิเคราะห์:
+          </h3>
           <div className="text-lg text-slate-700 whitespace-pre-line leading-relaxed">
             {analysis}
           </div>
           <p className="mt-4 text-xs text-slate-400 text-center">
-            *ระบบอาจผิดพลาดได้ โปรดตรวจสอบกับฉลากยาหรือแพทย์อีกครั้ง
+            *ระบบ AI อาจมีข้อผิดพลาด โปรดใช้วิจารณญาณ
           </p>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Medication, UserProfile } from '../types';
-import { CheckCircle, Circle, Sun, Moon, Coffee, Phone } from 'lucide-react';
+import { CheckCircle, Circle, Sun, Moon, Coffee, Phone, Activity, Heart } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 interface Props {
@@ -70,6 +70,26 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, onToggleMed }
               </Pie>
             </PieChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+      
+      {/* Vitals / Health Status (New Feature) */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-pink-50 p-4 rounded-3xl border border-pink-100">
+            <div className="flex items-center text-pink-700 mb-2">
+                <Activity size={20} className="mr-2"/>
+                <span className="font-bold">ความดัน</span>
+            </div>
+            <p className="text-3xl font-bold text-slate-800">128/80</p>
+            <p className="text-xs text-slate-500 mt-1">ปกติ (เมื่อวาน)</p>
+        </div>
+        <div className="bg-blue-50 p-4 rounded-3xl border border-blue-100">
+             <div className="flex items-center text-blue-700 mb-2">
+                <Heart size={20} className="mr-2"/>
+                <span className="font-bold">น้ำตาล</span>
+            </div>
+            <p className="text-3xl font-bold text-slate-800">105</p>
+            <p className="text-xs text-slate-500 mt-1">mg/dL (เช้านี้)</p>
         </div>
       </div>
 
