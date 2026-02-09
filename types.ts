@@ -24,6 +24,13 @@ export interface HealthMetric {
   label: string;
 }
 
+export interface VitalSigns {
+  systolic: number; // Pressure High (e.g. 120)
+  diastolic: number; // Pressure Low (e.g. 80)
+  sugar: number; // mg/dL
+  lastUpdated: Date;
+}
+
 export type ViewState = 'home' | 'chat' | 'scan' | 'profile';
 
 export interface UserProfile {

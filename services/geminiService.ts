@@ -115,3 +115,49 @@ export const analyzeFoodImage = async (
     return "ขออภัยค่ะ ไม่สามารถวิเคราะห์อาหารได้ในขณะนี้";
   }
 };
+
+export const analyzeFaceHealth = async (base64Image: string): Promise<string> => {
+  try {
+    const modelId = 'gemini-3-flash-preview';
+
+    const prompt = `
+      Role: Friendly AI Health Companion.
+      Task: Analyze the selfie of an elderly person. Estimate their "Energy Level" and "Mood" based on facial expression (Smile, eyes, brightness).
+      
+      IMPORTANT: This is for entertainment and encouragement only. NOT medical diagnosis.
+      
+      Output strict JSON format ONLY:
+      {
+        "energyScore": number (0-100),
+        "moodScore": number (0-100),
+        "hydrationGuess": "High" | "Medium" | "Low",
+        "compliment": "A very sweet, specific compliment in Thai about their smile or look.",
+        "advice": "A gentle health suggestion in Thai (e.g., drink water, rest eyes)."
+      }
+      
+      Do not include markdown code blocks. Just the raw JSON string.
+    `;
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: modelId,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/jpeg', // Assuming jpeg for simplicity
+              data: base64Image
+            }
+          },
+          {
+            text: prompt
+          }
+        ]
+      }
+    });
+
+    return response.text || "{}";
+  } catch (error) {
+    console.error("Gemini Face Error:", error);
+    return "{}";
+  }
+};

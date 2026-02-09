@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, MessageCircle, Camera, User } from 'lucide-react';
+import { Home, MessageCircle, ScanFace, User } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface NavigationProps {
@@ -9,10 +9,10 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
   const navItems: { id: ViewState; label: string; icon: React.ReactNode }[] = [
-    { id: 'home', label: 'หน้าหลัก', icon: <Home size={30} /> },
-    { id: 'chat', label: 'คุยกับหมอ', icon: <MessageCircle size={30} /> },
-    { id: 'scan', label: 'สแกนยา', icon: <Camera size={30} /> },
-    { id: 'profile', label: 'ข้อมูลฉัน', icon: <User size={30} /> },
+    { id: 'home', label: 'หน้าหลัก', icon: <Home size={28} /> },
+    { id: 'chat', label: 'คุยกับหมอ', icon: <MessageCircle size={28} /> },
+    { id: 'scan', label: 'AI สแกน', icon: <ScanFace size={28} /> },
+    { id: 'profile', label: 'ข้อมูลฉัน', icon: <User size={28} /> },
   ];
 
   return (
@@ -27,10 +27,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
               currentView === item.id ? 'text-pink-600 bg-pink-50' : 'text-slate-400 hover:bg-slate-50'
             }`}
           >
-            <div className={currentView === item.id ? 'scale-110 transition-transform' : ''}>
+            <div className={`transition-transform duration-300 ${currentView === item.id ? 'scale-110 -translate-y-1' : ''}`}>
                 {item.icon}
             </div>
-            <span className={`text-base font-bold ${currentView === item.id ? 'text-pink-700' : 'text-slate-500'}`}>{item.label}</span>
+            <span className={`text-xs font-bold ${currentView === item.id ? 'text-pink-700' : 'text-slate-500'}`}>{item.label}</span>
           </button>
         ))}
       </div>

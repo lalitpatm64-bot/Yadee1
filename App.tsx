@@ -5,13 +5,29 @@ import ChatInterface from './components/ChatInterface';
 import ImageUploader from './components/ImageUploader';
 import ProfileView from './components/ProfileView';
 import SafetyNetSystem from './components/SafetyNetSystem';
-import { ViewState, ChatMessage, Medication } from './types';
+import { ViewState, ChatMessage, Medication, VitalSigns } from './types';
 import { INITIAL_MEDICATIONS, MOCK_USER } from './constants';
 
 const App: React.FC = () => {
   const [currentView, setView] = useState<ViewState>('home');
   const [medications, setMedications] = useState<Medication[]>(INITIAL_MEDICATIONS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  
+  // New State for Vitals
+  const [vitals, setVitals] = useState<VitalSigns>({
+    systolic: 128,
+    diastolic: 80,
+    sugar: 105,
+    lastUpdated: new Date()
+  });
+
+  const updateVitals = (newVitals: Partial<VitalSigns>) => {
+    setVitals(prev => ({
+        ...prev,
+        ...newVitals,
+        lastUpdated: new Date()
+    }));
+  };
 
   const toggleMedication = (id: string) => {
     setMedications(prev => 
@@ -66,6 +82,8 @@ const App: React.FC = () => {
           <MedicationDashboard 
             user={MOCK_USER} 
             medications={medications} 
+            vitals={vitals}
+            onUpdateVitals={updateVitals}
             onToggleMed={toggleMedication} 
           />
         );

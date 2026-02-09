@@ -1,15 +1,24 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, X, Loader2, Pill, Utensils } from 'lucide-react';
-import { analyzeMedicalImage, analyzeFoodImage } from '../services/geminiService';
+import { Camera, Upload, X, Loader2, Pill, Utensils, Smile, Zap, Droplets, Sparkles } from 'lucide-react';
+import { analyzeMedicalImage, analyzeFoodImage, analyzeFaceHealth } from '../services/geminiService';
 import { MOCK_USER } from '../constants';
 
-type ScanMode = 'medication' | 'food';
+type ScanMode = 'medication' | 'food' | 'face';
+
+interface FaceMetrics {
+  energyScore: number;
+  moodScore: number;
+  hydrationGuess: string;
+  compliment: string;
+  advice: string;
+}
 
 const ImageUploader: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<string | null>(null);
+  const [faceMetrics, setFaceMetrics] = useState<FaceMetrics | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<ScanMode>('medication');
+  const [mode, setMode] = useState<ScanMode>('face'); // Default to the new cool feature
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,6 +30,7 @@ const ImageUploader: React.FC = () => {
         const base64Data = base64String.split(',')[1];
         setImage(base64Data);
         setAnalysis(null);
+        setFaceMetrics(null);
       };
       reader.readAsDataURL(file);
     }
@@ -29,84 +39,111 @@ const ImageUploader: React.FC = () => {
   const handleAnalyze = async () => {
     if (!image) return;
     setLoading(true);
-    let result;
     
     if (mode === 'medication') {
-        result = await analyzeMedicalImage(image);
-    } else {
-        result = await analyzeFoodImage(image, MOCK_USER);
+        const result = await analyzeMedicalImage(image);
+        setAnalysis(result);
+    } else if (mode === 'food') {
+        const result = await analyzeFoodImage(image, MOCK_USER);
+        setAnalysis(result);
+    } else if (mode === 'face') {
+        const jsonResult = await analyzeFaceHealth(image);
+        try {
+            // Clean up potentially messy JSON string
+            const cleanJson = jsonResult.replace(/```json/g, '').replace(/```/g, '').trim();
+            const metrics = JSON.parse(cleanJson);
+            setFaceMetrics(metrics);
+        } catch (e) {
+            setAnalysis("ขออภัยค่ะ ไม่สามารถประมวลผลใบหน้าได้ ลองถ่ายใหม่นะคะ");
+        }
     }
     
-    setAnalysis(result);
     setLoading(false);
   };
 
   const clearImage = () => {
     setImage(null);
     setAnalysis(null);
+    setFaceMetrics(null);
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }
   };
 
+  const renderScanButton = (scanMode: ScanMode, label: string, icon: React.ReactNode, colorClass: string, activeColor: string) => (
+    <button 
+        onClick={() => { setMode(scanMode); clearImage(); }}
+        className={`flex-1 flex flex-col items-center justify-center py-3 rounded-2xl font-bold transition-all ${
+            mode === scanMode 
+            ? `bg-white ${activeColor} shadow-md scale-105 ring-2 ring-offset-2 ring-slate-100` 
+            : 'text-slate-400 hover:bg-slate-200/50'
+        }`}
+    >
+        <div className="mb-1">{icon}</div>
+        <span className="text-xs">{label}</span>
+    </button>
+  );
+
   return (
-    <div className="p-4 flex flex-col items-center space-y-6 pb-24 h-full overflow-y-auto">
+    <div className="p-4 flex flex-col items-center space-y-6 pb-24 h-full overflow-y-auto bg-slate-50">
       
       {/* Mode Switcher */}
-      <div className="flex bg-slate-200 p-1 rounded-2xl w-full max-w-md">
-        <button 
-            onClick={() => { setMode('medication'); clearImage(); }}
-            className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
-                mode === 'medication' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-500 hover:bg-slate-300/50'
-            }`}
-        >
-            <Pill className="mr-2" size={20} />
-            สแกนยา
-        </button>
-        <button 
-            onClick={() => { setMode('food'); clearImage(); }}
-            className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
-                mode === 'food' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-slate-300/50'
-            }`}
-        >
-            <Utensils className="mr-2" size={20} />
-            สแกนอาหาร
-        </button>
+      <div className="flex bg-slate-200 p-1.5 rounded-3xl w-full max-w-md gap-1">
+        {renderScanButton('face', 'สแกนหน้า', <Smile size={24}/>, 'text-purple-600', 'text-purple-600')}
+        {renderScanButton('medication', 'สแกนยา', <Pill size={24}/>, 'text-pink-600', 'text-pink-600')}
+        {renderScanButton('food', 'สแกนอาหาร', <Utensils size={24}/>, 'text-orange-600', 'text-orange-600')}
       </div>
 
-      <div className="text-center">
-        <h2 className={`text-2xl font-bold ${mode === 'medication' ? 'text-pink-800' : 'text-orange-700'}`}>
-            {mode === 'medication' ? 'ตรวจสอบยา' : 'ตรวจสอบอาหาร'}
+      <div className="text-center animate-fade-in">
+        <h2 className={`text-3xl font-bold ${
+            mode === 'face' ? 'text-purple-800' : mode === 'medication' ? 'text-pink-800' : 'text-orange-800'
+        }`}>
+            {mode === 'face' ? 'กระจกวิเศษ AI ✨' : mode === 'medication' ? 'ผู้ช่วยสแกนยา 💊' : 'นักโภชนาการ 🥗'}
         </h2>
-        <p className="text-slate-500 text-lg mt-1">
-            {mode === 'medication' 
-                ? 'ถ่ายรูปยาเพื่อให้ AI ช่วยบอกวิธีใช้' 
-                : 'ถ่ายรูปอาหารเพื่อดูว่า "ทานได้ไหม"'}
+        <p className="text-slate-500 text-base mt-2 px-6">
+            {mode === 'face' 
+                ? 'เช็คพลังงานและความสดใสของคุณวันนี้' 
+                : mode === 'medication' 
+                    ? 'ถ่ายรูปซองยาหรือเม็ดยาเพื่อดูวิธีใช้' 
+                    : 'ถ่ายรูปอาหารเพื่อดูว่าเหมาะกับสุขภาพไหม'}
         </p>
       </div>
 
       {/* Image Preview Area */}
-      <div className={`w-full max-w-md aspect-square bg-slate-100 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden shadow-inner ${
-          mode === 'medication' ? 'border-pink-300' : 'border-orange-300'
+      <div className={`w-full max-w-md aspect-square bg-slate-100 rounded-[2.5rem] border-4 border-dashed flex flex-col items-center justify-center relative overflow-hidden shadow-inner transition-colors ${
+          mode === 'face' ? 'border-purple-300' : mode === 'medication' ? 'border-pink-300' : 'border-orange-300'
       }`}>
         {image ? (
           <>
             <img 
               src={`data:image/jpeg;base64,${image}`} 
               alt="Uploaded" 
-              className="w-full h-full object-cover" 
+              className={`w-full h-full object-cover ${mode === 'face' ? 'scale-x-[-1]' : ''}`} // Mirror effect for selfie
             />
+            {/* Overlay Scan Effect when Loading */}
+            {loading && (
+                <div className="absolute inset-0 bg-black/30 z-10">
+                    <div className="w-full h-1 bg-white/80 shadow-[0_0_15px_rgba(255,255,255,1)] absolute top-0 animate-[scan_2s_infinite_linear]"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-white font-mono text-xl animate-pulse">AI ANALYZING...</div>
+                    </div>
+                </div>
+            )}
             <button 
                 onClick={clearImage}
-                className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-slate-700 shadow-md"
+                className="absolute top-4 right-4 bg-white/90 p-2 rounded-full text-slate-700 shadow-xl backdrop-blur-sm z-20"
             >
                 <X size={24} />
             </button>
           </>
         ) : (
           <div className="text-center p-6">
-            <Camera size={64} className={`mx-auto mb-2 ${mode === 'medication' ? 'text-pink-200' : 'text-orange-200'}`} />
-            <p className="text-slate-400">แตะเพื่อถ่ายรูป</p>
+            <div className={`inline-block p-6 rounded-full mb-4 ${
+                mode === 'face' ? 'bg-purple-100 text-purple-400' : mode === 'medication' ? 'bg-pink-100 text-pink-400' : 'bg-orange-100 text-orange-400'
+            }`}>
+                <Camera size={48} />
+            </div>
+            <p className="text-slate-400 font-medium">แตะปุ่มด้านล่างเพื่อถ่ายรูป</p>
           </div>
         )}
       </div>
@@ -114,56 +151,134 @@ const ImageUploader: React.FC = () => {
       {/* Controls */}
       <div className="w-full max-w-md space-y-4">
         {!image ? (
-            <label className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-transform text-white ${
-                mode === 'medication' ? 'bg-pink-500' : 'bg-orange-500'
+            <label className={`flex items-center justify-center w-full py-5 rounded-3xl text-xl font-bold shadow-xl cursor-pointer active:scale-95 transition-transform text-white ${
+                mode === 'face' ? 'bg-purple-600' : mode === 'medication' ? 'bg-pink-500' : 'bg-orange-500'
             }`}>
                 <Camera className="mr-2" size={28} />
-                ถ่ายรูป
+                {mode === 'face' ? 'ถ่ายเซลฟี่ (Selfie)' : 'ถ่ายรูป'}
                 <input 
                     type="file" 
                     accept="image/*" 
+                    capture={mode === 'face' ? 'user' : 'environment'} // Force selfie cam for face mode
                     className="hidden" 
                     onChange={handleFileChange} 
                     ref={fileInputRef}
                 />
             </label>
         ) : (
-            <button 
-                onClick={handleAnalyze} 
-                disabled={loading}
-                className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg transition-all text-white active:scale-95 ${
-                    loading ? 'bg-slate-300 cursor-not-allowed' : (mode === 'medication' ? 'bg-pink-500' : 'bg-orange-500')
-                }`}
-            >
-                {loading ? (
-                    <>
-                        <Loader2 className="mr-2 animate-spin" size={28} />
-                        กำลังวิเคราะห์...
-                    </>
-                ) : (
-                    <>
-                        <Upload className="mr-2" size={28} />
-                        วิเคราะห์
-                    </>
-                )}
-            </button>
+            !faceMetrics && !analysis && (
+                <button 
+                    onClick={handleAnalyze} 
+                    disabled={loading}
+                    className={`flex items-center justify-center w-full py-5 rounded-3xl text-xl font-bold shadow-xl transition-all text-white active:scale-95 ${
+                        loading ? 'bg-slate-300 cursor-not-allowed' : (mode === 'face' ? 'bg-purple-600' : mode === 'medication' ? 'bg-pink-500' : 'bg-orange-500')
+                    }`}
+                >
+                    {loading ? (
+                        <>
+                            <Loader2 className="mr-2 animate-spin" size={28} />
+                            ระบบกำลังประมวลผล...
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="mr-2" size={28} />
+                            เริ่มวิเคราะห์
+                        </>
+                    )}
+                </button>
+            )
         )}
       </div>
 
-      {/* Result Area */}
+      {/* Result Area: Face Metrics (Futuristic HUD) */}
+      {faceMetrics && (
+        <div className="w-full max-w-md animate-[fadeIn_0.5s_ease-out]">
+            <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-purple-100 relative">
+                {/* Decorative Top Bar */}
+                <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500"></div>
+                
+                <div className="p-6 space-y-6">
+                    <div className="text-center mb-6">
+                        <h3 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                            <Sparkles className="text-yellow-400 fill-yellow-400" /> 
+                            ผลลัพธ์สุขภาพ
+                        </h3>
+                    </div>
+
+                    {/* Progress Bars */}
+                    <div className="space-y-4">
+                        {/* Energy */}
+                        <div>
+                            <div className="flex justify-between mb-1">
+                                <span className="font-bold text-slate-600 flex items-center"><Zap size={18} className="mr-1 text-yellow-500"/> พลังงาน (Energy)</span>
+                                <span className="font-bold text-slate-800">{faceMetrics.energyScore}%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+                                <div 
+                                    className="bg-gradient-to-r from-yellow-400 to-orange-500 h-4 rounded-full transition-all duration-1000 ease-out" 
+                                    style={{ width: `${faceMetrics.energyScore}%` }}
+                                ></div>
+                            </div>
+                        </div>
+
+                        {/* Mood */}
+                        <div>
+                            <div className="flex justify-between mb-1">
+                                <span className="font-bold text-slate-600 flex items-center"><Smile size={18} className="mr-1 text-pink-500"/> ความสดใส (Mood)</span>
+                                <span className="font-bold text-slate-800">{faceMetrics.moodScore}%</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
+                                <div 
+                                    className="bg-gradient-to-r from-pink-400 to-purple-500 h-4 rounded-full transition-all duration-1000 ease-out delay-100" 
+                                    style={{ width: `${faceMetrics.moodScore}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Compliment Card */}
+                    <div className="bg-purple-50 p-5 rounded-2xl border border-purple-100 text-center relative mt-4">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow-sm text-xs font-bold text-purple-600 border border-purple-100 uppercase tracking-wider">
+                            AI Comment
+                        </div>
+                        <p className="text-lg font-medium text-purple-800 italic leading-relaxed">
+                            "{faceMetrics.compliment}"
+                        </p>
+                    </div>
+
+                    {/* Advice */}
+                    <div className="flex items-start bg-slate-50 p-4 rounded-2xl">
+                        <div className="bg-white p-2 rounded-full shadow-sm mr-3 text-blue-500">
+                            <Droplets size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-slate-700 text-sm mb-1">คำแนะนำสุขภาพ</h4>
+                            <p className="text-slate-600 leading-snug">{faceMetrics.advice}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button onClick={clearImage} className="w-full mt-4 py-3 text-slate-500 font-medium hover:text-slate-700">
+                สแกนใหม่อีกครั้ง
+            </button>
+        </div>
+      )}
+
+      {/* Result Area: Standard Text Analysis */}
       {analysis && (
-        <div className={`w-full max-w-md bg-white p-6 rounded-3xl shadow-lg border animate-fade-in ${
+        <div className={`w-full max-w-md bg-white p-6 rounded-[2rem] shadow-xl border animate-fade-in ${
             mode === 'medication' ? 'border-pink-100' : 'border-orange-100'
         }`}>
-          <h3 className={`text-xl font-bold mb-2 ${mode === 'medication' ? 'text-pink-800' : 'text-orange-800'}`}>
-            ผลการวิเคราะห์:
+          <h3 className={`text-xl font-bold mb-3 flex items-center ${mode === 'medication' ? 'text-pink-800' : 'text-orange-800'}`}>
+            {mode === 'medication' ? <Pill className="mr-2"/> : <Utensils className="mr-2"/>}
+            ผลการวิเคราะห์
           </h3>
           <div className="text-lg text-slate-700 whitespace-pre-line leading-relaxed">
             {analysis}
           </div>
-          <p className="mt-4 text-xs text-slate-400 text-center">
-            *ระบบ AI อาจมีข้อผิดพลาด โปรดใช้วิจารณญาณ
-          </p>
+          <button onClick={clearImage} className="w-full mt-6 bg-slate-100 py-3 rounded-xl font-bold text-slate-600">
+                ตกลง / สแกนใหม่
+          </button>
         </div>
       )}
     </div>
