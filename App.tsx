@@ -37,6 +37,28 @@ const App: React.FC = () => {
     alert(`เพิ่มยา "${newMed.name}" เรียบร้อยแล้วค่ะ`);
   };
 
+  // Logic to simulate a missed dose for demonstration/testing
+  const simulateMissedDose = () => {
+    const now = new Date();
+    // Set time to 5 minutes ago to trigger Stage 1 alert immediately
+    const pastTime = new Date(now.getTime() - 5 * 60000); 
+    const timeString = `${pastTime.getHours().toString().padStart(2, '0')}:${pastTime.getMinutes().toString().padStart(2, '0')}`;
+
+    setMedications(prev => {
+        if (prev.length === 0) return prev;
+        // Modify the first medication to be untaken and past due
+        const newMeds = [...prev];
+        newMeds[0] = {
+            ...newMeds[0],
+            taken: false,
+            time: timeString,
+            alertLevel: 0 // Reset level so SafetyNet picks it up as new Stage 1
+        };
+        return newMeds;
+    });
+    alert("ระบบกำลังจำลองสถานการณ์: ลืมทานยาเมื่อ 5 นาทีที่แล้ว...");
+  };
+
   const renderView = () => {
     switch (currentView) {
       case 'home':
@@ -58,7 +80,10 @@ const App: React.FC = () => {
         return <ImageUploader />;
       case 'profile':
         return (
-          <ProfileView onAddMedication={handleAddMedication} />
+          <ProfileView 
+            onAddMedication={handleAddMedication} 
+            onSimulateAlert={simulateMissedDose}
+          />
         );
       default:
         return <div>View not found</div>;
@@ -66,7 +91,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-full bg-slate-50 flex flex-col">
+    // Use fixed inset-0 and h-[100dvh] for robust mobile layout
+    <div className="fixed inset-0 w-full h-[100dvh] bg-slate-50 flex flex-col overflow-hidden">
       {/* Global Safety Net System (Overlays) */}
       <SafetyNetSystem 
          medications={medications} 
@@ -74,9 +100,12 @@ const App: React.FC = () => {
          onTakeMedication={toggleMedication}
       />
 
-      <div className="flex-1 overflow-hidden relative">
+      {/* Main Content Area */}
+      <div className="flex-1 w-full overflow-hidden relative">
         {renderView()}
       </div>
+      
+      {/* Navigation Bar */}
       <Navigation currentView={currentView} setView={setView} />
     </div>
   );

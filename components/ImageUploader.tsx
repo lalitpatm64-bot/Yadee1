@@ -57,7 +57,7 @@ const ImageUploader: React.FC = () => {
         <button 
             onClick={() => { setMode('medication'); clearImage(); }}
             className={`flex-1 flex items-center justify-center py-3 rounded-xl font-bold transition-all ${
-                mode === 'medication' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:bg-slate-300/50'
+                mode === 'medication' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-500 hover:bg-slate-300/50'
             }`}
         >
             <Pill className="mr-2" size={20} />
@@ -75,7 +75,7 @@ const ImageUploader: React.FC = () => {
       </div>
 
       <div className="text-center">
-        <h2 className={`text-2xl font-bold ${mode === 'medication' ? 'text-teal-800' : 'text-orange-700'}`}>
+        <h2 className={`text-2xl font-bold ${mode === 'medication' ? 'text-pink-800' : 'text-orange-700'}`}>
             {mode === 'medication' ? 'ตรวจสอบยา' : 'ตรวจสอบอาหาร'}
         </h2>
         <p className="text-slate-500 text-lg mt-1">
@@ -87,7 +87,7 @@ const ImageUploader: React.FC = () => {
 
       {/* Image Preview Area */}
       <div className={`w-full max-w-md aspect-square bg-slate-100 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden shadow-inner ${
-          mode === 'medication' ? 'border-teal-300' : 'border-orange-300'
+          mode === 'medication' ? 'border-pink-300' : 'border-orange-300'
       }`}>
         {image ? (
           <>
@@ -105,7 +105,7 @@ const ImageUploader: React.FC = () => {
           </>
         ) : (
           <div className="text-center p-6">
-            <Camera size={64} className={`mx-auto mb-2 ${mode === 'medication' ? 'text-teal-200' : 'text-orange-200'}`} />
+            <Camera size={64} className={`mx-auto mb-2 ${mode === 'medication' ? 'text-pink-200' : 'text-orange-200'}`} />
             <p className="text-slate-400">แตะเพื่อถ่ายรูป</p>
           </div>
         )}
@@ -115,7 +115,7 @@ const ImageUploader: React.FC = () => {
       <div className="w-full max-w-md space-y-4">
         {!image ? (
             <label className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-transform text-white ${
-                mode === 'medication' ? 'bg-teal-600' : 'bg-orange-500'
+                mode === 'medication' ? 'bg-pink-500' : 'bg-orange-500'
             }`}>
                 <Camera className="mr-2" size={28} />
                 ถ่ายรูป
@@ -132,7 +132,7 @@ const ImageUploader: React.FC = () => {
                 onClick={handleAnalyze} 
                 disabled={loading}
                 className={`flex items-center justify-center w-full py-4 rounded-2xl text-xl font-bold shadow-lg transition-all text-white active:scale-95 ${
-                    loading ? 'bg-slate-300 cursor-not-allowed' : (mode === 'medication' ? 'bg-teal-600' : 'bg-orange-500')
+                    loading ? 'bg-slate-300 cursor-not-allowed' : (mode === 'medication' ? 'bg-pink-500' : 'bg-orange-500')
                 }`}
             >
                 {loading ? (
@@ -153,9 +153,9 @@ const ImageUploader: React.FC = () => {
       {/* Result Area */}
       {analysis && (
         <div className={`w-full max-w-md bg-white p-6 rounded-3xl shadow-lg border animate-fade-in ${
-            mode === 'medication' ? 'border-teal-100' : 'border-orange-100'
+            mode === 'medication' ? 'border-pink-100' : 'border-orange-100'
         }`}>
-          <h3 className={`text-xl font-bold mb-2 ${mode === 'medication' ? 'text-teal-800' : 'text-orange-800'}`}>
+          <h3 className={`text-xl font-bold mb-2 ${mode === 'medication' ? 'text-pink-800' : 'text-orange-800'}`}>
             ผลการวิเคราะห์:
           </h3>
           <div className="text-lg text-slate-700 whitespace-pre-line leading-relaxed">

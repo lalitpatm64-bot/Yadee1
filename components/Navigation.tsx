@@ -24,13 +24,13 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
             key={item.id}
             onClick={() => setView(item.id)}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
-              currentView === item.id ? 'text-teal-600 bg-teal-50' : 'text-slate-400 hover:bg-slate-50'
+              currentView === item.id ? 'text-pink-600 bg-pink-50' : 'text-slate-400 hover:bg-slate-50'
             }`}
           >
             <div className={currentView === item.id ? 'scale-110 transition-transform' : ''}>
                 {item.icon}
             </div>
-            <span className={`text-base font-bold ${currentView === item.id ? 'text-teal-700' : 'text-slate-500'}`}>{item.label}</span>
+            <span className={`text-base font-bold ${currentView === item.id ? 'text-pink-700' : 'text-slate-500'}`}>{item.label}</span>
           </button>
         ))}
       </div>

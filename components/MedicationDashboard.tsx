@@ -19,7 +19,8 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, onToggleMed }
     { name: 'Taken', value: takenCount },
     { name: 'Remaining', value: totalCount - takenCount },
   ];
-  const COLORS = ['#14b8a6', '#e2e8f0']; // Teal and Slate
+  // Updated colors to Pink (#db2777 is pink-600) and Slate
+  const COLORS = ['#db2777', '#e2e8f0']; 
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -29,13 +30,15 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, onToggleMed }
   };
 
   return (
-    <div className="p-4 space-y-6 pb-24">
+    // Added h-full overflow-y-auto to enable scrolling
+    // Added pb-24 to ensure content isn't hidden behind the bottom navigation
+    <div className="h-full overflow-y-auto p-4 space-y-6 pb-24">
       {/* Header */}
-      <header className="flex justify-between items-center bg-teal-600 text-white p-6 rounded-3xl shadow-lg">
+      <header className="flex justify-between items-center bg-pink-500 text-white p-6 rounded-3xl shadow-lg">
         <div>
           <h1 className="text-2xl font-bold">{getGreeting()}ค่ะ,</h1>
           <h2 className="text-xl font-medium opacity-90">{user.name}</h2>
-          <p className="text-teal-100 mt-1 text-base">วันนี้คุณเก่งมากเลยนะคะ!</p>
+          <p className="text-pink-100 mt-1 text-base">วันนี้คุณเก่งมากเลยนะคะ!</p>
         </div>
         <div className="bg-white/20 p-2 rounded-full">
            <Sun size={40} className="text-yellow-300" />
@@ -95,13 +98,13 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, onToggleMed }
 
       {/* Med List */}
       <div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-4 pl-2 border-l-4 border-teal-500">ยาที่ต้องทานวันนี้</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mb-4 pl-2 border-l-4 border-pink-500">ยาที่ต้องทานวันนี้</h2>
         <div className="space-y-4">
           {medications.map((med) => (
             <div 
               key={med.id} 
               className={`flex items-center p-4 rounded-2xl border-2 transition-all ${
-                med.taken ? 'bg-teal-50 border-teal-200' : 'bg-white border-slate-200 shadow-sm'
+                med.taken ? 'bg-pink-50 border-pink-200' : 'bg-white border-slate-200 shadow-sm'
               }`}
             >
               <div 
@@ -109,13 +112,13 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, onToggleMed }
                 className="cursor-pointer mr-4"
               >
                 {med.taken ? (
-                  <CheckCircle size={44} className="text-teal-500" />
+                  <CheckCircle size={44} className="text-pink-500" />
                 ) : (
                   <Circle size={44} className="text-slate-300" />
                 )}
               </div>
               <div className="flex-1">
-                <h3 className={`text-xl font-bold ${med.taken ? 'text-teal-800 line-through decoration-2' : 'text-slate-800'}`}>
+                <h3 className={`text-xl font-bold ${med.taken ? 'text-pink-800 line-through decoration-2' : 'text-slate-800'}`}>
                   {med.name}
                 </h3>
                 <p className="text-slate-500 text-lg">{med.dosage}</p>
