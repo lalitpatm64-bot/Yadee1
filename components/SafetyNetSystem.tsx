@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Medication } from '../types';
-import { Bell, User, Users, Phone, X, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, Siren, Coffee, Hourglass } from 'lucide-react';
+import { Bell, User, Users, Phone, X, CheckCircle, Clock, Volume2, VolumeX, AlertTriangle, Siren, Coffee, Hourglass, PhoneOutgoing } from 'lucide-react';
+import { CAREGIVER_CONTACT } from '../constants';
 
 interface Props {
   medications: Medication[];
@@ -24,6 +25,9 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
   const [isMuted, setIsMuted] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   
+  // Auto Call Logic
+  const [autoCallCountdown, setAutoCallCountdown] = useState<number | null>(null);
+  
   const isComponentMounted = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -38,6 +42,22 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
         }
     };
   }, []);
+
+  // --- Auto Call Countdown Effect ---
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (autoCallCountdown !== null && autoCallCountdown > 0) {
+        timer = setTimeout(() => {
+            setAutoCallCountdown(prev => (prev !== null ? prev - 1 : null));
+        }, 1000);
+    } else if (autoCallCountdown === 0) {
+        // Trigger Call
+        window.location.href = `tel:${CAREGIVER_CONTACT}`;
+        // Reset countdown to avoid loop, but keep alert open
+        setAutoCallCountdown(null); 
+    }
+    return () => clearTimeout(timer);
+  }, [autoCallCountdown]);
 
   // Audio Playback / TTS Logic
   useEffect(() => {
@@ -56,11 +76,8 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
         const specificVoice = activeAlert.customVoice;
         const globalVoice = customVoiceUrl;
         
-        // Priority 1: Specific Medication Voice (Only for late alerts, usually users record "Take medicine now")
-        // For Stage 0 (Pre-alert), we might prefer TTS or a specific logic unless user recorded a "Preparation" voice.
-        // Assuming user recorded voice is "Go take medicine", using it for pre-alert might be too aggressive? 
-        // Let's use TTS for Stage 0 primarily unless we add a specific "Pre-alert voice" feature later.
-        if (specificVoice && activeAlert.stage > 0) {
+        // Priority 1: Specific Medication Voice
+        if (specificVoice && activeAlert.stage > 0 && activeAlert.stage < 3) {
             const audio = new Audio(specificVoice);
             audioRef.current = audio;
             audio.play().catch(e => console.error("Specific audio playback failed:", e));
@@ -72,8 +89,8 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
             return;
         }
         
-        // Priority 2: Global Profile Voice (Only for late alerts)
-        if (globalVoice && activeAlert.stage > 0) {
+        // Priority 2: Global Profile Voice
+        if (globalVoice && activeAlert.stage > 0 && activeAlert.stage < 3) {
             const audio = new Audio(globalVoice);
             audioRef.current = audio;
             audio.play().catch(e => console.error("Global audio playback failed:", e));
@@ -102,13 +119,14 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
             text = `คุณยายคะ เลยเวลาทาน${displayName} มา 30 นาทีแล้วนะ ${appearanceInfo} ทานหน่อยนะคนเก่ง`;
         }
         else if (activeAlert.stage === 3) {
-            text = `คุณยายคะ! ฉุกเฉินแล้ว ลืมทาน${displayName} นานเกินไปแล้ว รีบทานเดี๋ยวนี้เลยนะ!`;
+            // Stage 3: High Urgency + Auto Call Announcement
+            text = `คุณยายคะ! ฉุกเฉินแล้ว ลืมทาน${displayName} นานเกินไปแล้ว อันตรายนะ เดี๋ยวหนูจะโทรตามหลานให้เดี๋ยวนี้เลยนะคะ`;
         }
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'th-TH';
-        utterance.pitch = 1.4;
-        utterance.rate = 0.9;
+        utterance.pitch = activeAlert.stage === 3 ? 1.2 : 1.4; // Serious tone for stage 3
+        utterance.rate = activeAlert.stage === 3 ? 1.0 : 0.9;
         utterance.volume = 1.0;
 
         utterance.onend = () => {
@@ -152,8 +170,7 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
         
         let diffMinutes = currentTimeInMinutes - medTimeInMinutes;
 
-        // --- STAGE 0: Pre-alert (10 minutes before) ---
-        // Condition: Time is between -10 and -1 (e.g., 7:50 for 8:00)
+        // --- STAGE 0: Pre-alert ---
         if (diffMinutes >= -10 && diffMinutes < 0) {
             const alertId = `${med.id}_stage0`;
             if (!dismissedAlerts.has(alertId) && !activeAlert) {
@@ -167,6 +184,7 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
                     customVoice: med.customAlertVoice
                 });
                 setIsMuted(false);
+                setAutoCallCountdown(null);
             }
         }
 
@@ -190,12 +208,6 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
             }
 
             if (triggeredStage) {
-                const alertId = `${med.id}_stage${triggeredStage}`;
-                // Only trigger if we haven't just dismissed this specific stage? 
-                // Actually for late stages, we want to be persistent, but `activeAlert` check handles single instance.
-                // The `dismissedAlerts` logic is mainly for the "Pre-alert" which shouldn't reappear once acknowledged.
-                // For Late alerts, we rely on `alertLevel` in med object to prevent re-triggering same level repeatedly via `currentLevel < X`.
-                
                 setActiveAlert({ 
                     medId: med.id, 
                     medName: med.name, 
@@ -207,6 +219,13 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
                 });
                 onUpdateMedication(med.id, { alertLevel: newLevel });
                 setIsMuted(false);
+                
+                // Trigger Auto-Call Countdown only for Stage 3
+                if (triggeredStage === 3) {
+                    setAutoCallCountdown(10); // Start 10 seconds countdown
+                } else {
+                    setAutoCallCountdown(null);
+                }
             }
         }
       });
@@ -220,7 +239,12 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
       if (activeAlert) {
           setDismissedAlerts(prev => new Set(prev).add(`${activeAlert.medId}_stage${activeAlert.stage}`));
           setActiveAlert(null);
+          setAutoCallCountdown(null); // Cancel call if dismissed
       }
+  };
+
+  const cancelAutoCall = () => {
+      setAutoCallCountdown(null);
   };
 
   if (!activeAlert) return null;
@@ -262,9 +286,9 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
       gradient: 'from-red-600 to-red-900',
       icon: <Siren size={80} className="text-white animate-[spin_0.5s_infinite]" />,
       title: '🚨 ฉุกเฉิน! 1 ชั่วโมงแล้ว',
-      subtitle: 'กรุณาทานยาทันที หรือโทรหาหนูนะ!',
+      subtitle: 'กำลังติดต่อหลานให้ตรวจสอบด่วน...',
       actionText: 'รับทราบ / กำลังทาน',
-      secondaryActionText: 'ติดต่อฉุกเฉิน',
+      secondaryActionText: 'หยุดการโทรออก',
       textColor: 'text-red-50',
       bgAnimate: 'animate-pulse'
     }
@@ -286,10 +310,26 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
       <div className="absolute top-10 left-10 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-pulse" />
       <div className="absolute bottom-10 right-10 w-48 h-48 bg-white/10 rounded-full blur-3xl animate-pulse delay-75" />
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-md p-8 text-center space-y-8">
-        <div className={`bg-white/20 p-8 rounded-full shadow-2xl backdrop-blur-sm ring-4 ring-white/30 ${activeAlert.stage === 3 ? 'animate-bounce' : ''}`}>
-            {config.icon}
-        </div>
+      <div className="relative z-10 flex flex-col items-center w-full max-w-md p-8 text-center space-y-6">
+        
+        {/* Stage 3 Auto Call Countdown UI */}
+        {activeAlert.stage === 3 && autoCallCountdown !== null && (
+             <div className="w-full bg-white/20 backdrop-blur-md rounded-2xl p-4 border-2 border-white/40 animate-pulse mb-2">
+                 <p className="text-white text-lg font-bold mb-2 flex items-center justify-center">
+                     <PhoneOutgoing className="mr-2" /> กำลังโทรหาหลานใน...
+                 </p>
+                 <div className="text-6xl font-black text-white drop-shadow-xl font-mono">
+                     {autoCallCountdown}
+                 </div>
+                 <p className="text-white/80 text-sm mt-2">วินาที</p>
+             </div>
+        )}
+
+        {!(activeAlert.stage === 3 && autoCallCountdown !== null) && (
+            <div className={`bg-white/20 p-8 rounded-full shadow-2xl backdrop-blur-sm ring-4 ring-white/30 ${activeAlert.stage === 3 ? 'animate-bounce' : ''}`}>
+                {config.icon}
+            </div>
+        )}
 
         <div className="space-y-2">
             <h2 className={`text-4xl font-bold ${config.textColor} drop-shadow-md`}>
@@ -302,9 +342,11 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
                  <div className="inline-flex items-center bg-white/20 rounded-full px-3 py-1 mt-2 animate-pulse">
                     <Volume2 size={16} className="mr-1 text-white"/>
                     <span className="text-xs text-white">
-                        {activeAlert.stage === 0 
-                            ? 'AI กำลังแจ้งเตือนล่วงหน้า...' 
-                            : (activeAlert.customVoice ? 'เสียงเตือนเฉพาะยานี้...' : (customVoiceUrl ? 'เสียงเตือนทั่วไป...' : `เสียง AI พูด: ${displayName}`))}
+                        {activeAlert.stage === 3 
+                           ? 'AI กำลังติดต่อฉุกเฉิน...' 
+                           : (activeAlert.stage === 0 
+                                ? 'AI กำลังแจ้งเตือนล่วงหน้า...' 
+                                : `เสียง AI พูด: ${displayName}`)}
                     </span>
                  </div>
             )}
@@ -330,31 +372,40 @@ const SafetyNetSystem: React.FC<Props> = ({ medications, onUpdateMedication, onT
                     <span className="text-slate-600 font-medium">{activeAlert.appearance}</span>
                 </div>
             )}
-            
-            <p className="text-slate-500 text-left text-lg">
-                เพื่อสุขภาพที่ดีของคุณยายนะคะ
-            </p>
         </div>
 
         {/* Primary Action Button */}
-        <button 
-             onClick={() => {
-                onTakeMedication(activeAlert.medId);
-                setActiveAlert(null);
-             }}
-             className={`w-full bg-white py-5 rounded-full text-2xl font-bold shadow-2xl active:scale-95 transition-all flex items-center justify-center ring-4 ring-white/50 ${activeAlert.stage === 0 ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`}
-        >
-             <CheckCircle className="mr-3" size={32} />
-             {config.actionText}
-        </button>
+        {activeAlert.stage === 3 && autoCallCountdown !== null ? (
+            <button 
+                 onClick={cancelAutoCall}
+                 className="w-full bg-white py-5 rounded-full text-2xl font-bold shadow-2xl active:scale-95 transition-all flex items-center justify-center ring-4 ring-white/50 text-red-600 hover:bg-red-50"
+            >
+                 <X className="mr-3" size={32} />
+                 ยกเลิกการโทร
+            </button>
+        ) : (
+            <button 
+                 onClick={() => {
+                    onTakeMedication(activeAlert.medId);
+                    setActiveAlert(null);
+                    setAutoCallCountdown(null);
+                 }}
+                 className={`w-full bg-white py-5 rounded-full text-2xl font-bold shadow-2xl active:scale-95 transition-all flex items-center justify-center ring-4 ring-white/50 ${activeAlert.stage === 0 ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`}
+            >
+                 <CheckCircle className="mr-3" size={32} />
+                 {config.actionText}
+            </button>
+        )}
 
         {/* Secondary Action (Dismiss/Snooze) */}
-        <button 
-             onClick={handleDismiss}
-             className="text-white/80 text-lg underline font-medium hover:text-white"
-        >
-             {config.secondaryActionText}
-        </button>
+        {!(activeAlert.stage === 3 && autoCallCountdown !== null) && (
+            <button 
+                 onClick={handleDismiss}
+                 className="text-white/80 text-lg underline font-medium hover:text-white"
+            >
+                 {config.secondaryActionText}
+            </button>
+        )}
 
       </div>
     </div>

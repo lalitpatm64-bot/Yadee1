@@ -11,6 +11,8 @@ export interface Medication {
   color?: string;
   alertLevel?: 0 | 1 | 2 | 3; // 0=None, 1=User, 2=Caregiver, 3=Emergency
   customAlertVoice?: string; // URL/Blob for specific medication alert
+  totalQuantity?: number; // Remaining stock
+  reorderThreshold?: number; // Notify when stock falls below this
 }
 
 export interface ChatMessage {
@@ -34,10 +36,17 @@ export interface VitalSigns {
   lastUpdated: Date;
 }
 
-export type ViewState = 'home' | 'chat' | 'scan' | 'profile';
+export interface GardenState {
+  level: number; // 1 = Seed, 2 = Sprout, 3 = Sapling, 4 = Tree, 5 = Blooming
+  waterPoints: number; // 0-100 to next level
+  totalPlantsGrown: number;
+}
+
+export type ViewState = 'home' | 'chat' | 'scan' | 'profile' | 'garden';
 
 export interface UserProfile {
   name: string;
   age: number;
   condition: string;
+  wakeUpTime?: string; // e.g., "06:00"
 }

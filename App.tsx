@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import MedicationDashboard from './components/MedicationDashboard';
 import ChatInterface from './components/ChatInterface';
 import ImageUploader from './components/ImageUploader';
 import ProfileView from './components/ProfileView';
 import SafetyNetSystem from './components/SafetyNetSystem';
-import { ViewState, ChatMessage, Medication, VitalSigns } from './types';
-import { INITIAL_MEDICATIONS, MOCK_USER } from './constants';
+import GardenView from './components/GardenView';
+import { ViewState, ChatMessage, Medication, VitalSigns, GardenState } from './types';
+import { INITIAL_MEDICATIONS, MOCK_USER, CAREGIVER_CONTACT } from './constants';
+import { Package, AlertTriangle, X, ShoppingBag, AlarmClock, PhoneOutgoing } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setView] = useState<ViewState>('home');
@@ -22,21 +24,137 @@ const App: React.FC = () => {
     lastUpdated: new Date()
   });
 
+  // Garden State (Gamification)
+  const [garden, setGarden] = useState<GardenState>({
+    level: 1,
+    waterPoints: 10,
+    totalPlantsGrown: 0
+  });
+
+  // State for Low Stock Alert Modal
+  const [lowStockAlert, setLowStockAlert] = useState<Medication | null>(null);
+
+  // Morning Check-in State
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [checkInAlertLevel, setCheckInAlertLevel] = useState<'idle' | 'warning'>('idle');
+  const [autoCallCountdown, setAutoCallCountdown] = useState<number | null>(null);
+
+  // Toast State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // --- Morning Check-in Logic ---
+  const handleCheckIn = () => {
+    setIsCheckedIn(true);
+    setCheckInAlertLevel('idle');
+    setAutoCallCountdown(null);
+    addGardenPoints(30); // Bonus points!
+    showToast("🌞 อรุณสวัสดิ์ค่ะ! รับ 30 คะแนน");
+  };
+
+  const simulateOversleep = () => {
+      setIsCheckedIn(false);
+      setCheckInAlertLevel('warning');
+      // Start auto-call countdown immediately for demo urgency
+      setAutoCallCountdown(10);
+  };
+
+  const cancelCheckInAlert = () => {
+      setCheckInAlertLevel('idle');
+      setAutoCallCountdown(null);
+      // We don't mark as checked in, just dismiss the alert
+  };
+
+  // --- Auto Call Countdown Effect for Morning Check-in ---
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (autoCallCountdown !== null && autoCallCountdown > 0) {
+        timer = setTimeout(() => {
+            setAutoCallCountdown(prev => (prev !== null ? prev - 1 : null));
+        }, 1000);
+    } else if (autoCallCountdown === 0) {
+        window.location.href = `tel:${CAREGIVER_CONTACT}`;
+        setAutoCallCountdown(null); 
+    }
+    return () => clearTimeout(timer);
+  }, [autoCallCountdown]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const updateVitals = (newVitals: Partial<VitalSigns>) => {
     setVitals(prev => ({
         ...prev,
         ...newVitals,
         lastUpdated: new Date()
     }));
+    // Also reward user for tracking vitals
+    addGardenPoints(10);
+  };
+
+  const addGardenPoints = (points: number) => {
+     setGarden(prev => {
+         let newPoints = prev.waterPoints + points;
+         let newLevel = prev.level;
+         let newTotal = prev.totalPlantsGrown;
+
+         if (newPoints >= 100) {
+             if (newLevel < 5) {
+                 newLevel += 1;
+                 newPoints = newPoints - 100;
+                 showToast("🎉 ต้นไม้โตขึ้นแล้ว! (Level Up)");
+             } else {
+                 // Harvest logic
+                 newTotal += 1;
+                 newLevel = 1; // Reset to Seed
+                 newPoints = 0;
+                 showToast("🍎 เก็บเกี่ยวผลไม้สำเร็จ! เริ่มปลูกต้นใหม่นะ");
+             }
+         } else {
+             // Don't show toast if it comes from CheckIn (handled separately)
+             // But logic is fine.
+         }
+
+         return {
+             level: newLevel,
+             waterPoints: newPoints,
+             totalPlantsGrown: newTotal
+         };
+     });
   };
 
   const toggleMedication = (id: string) => {
     setMedications(prev => 
       prev.map(med => {
-         // When taken, reset alert level to 0
          if (med.id === id) {
              const isTaking = !med.taken;
-             return { ...med, taken: isTaking, alertLevel: isTaking ? 0 : med.alertLevel };
+             let newQuantity = med.totalQuantity;
+             
+             // Logic: If taking, quantity - 1. If untaking (mistake), quantity + 1.
+             if (isTaking && newQuantity !== undefined) {
+                newQuantity = Math.max(0, newQuantity - 1);
+             } else if (!isTaking && newQuantity !== undefined) {
+                newQuantity = newQuantity + 1;
+             }
+             
+             // Check for low stock immediately after taking
+             if (isTaking && newQuantity !== undefined && med.reorderThreshold !== undefined && newQuantity <= med.reorderThreshold) {
+                 setLowStockAlert({ ...med, totalQuantity: newQuantity });
+             }
+
+             // Add Garden Points only when TAKING, not untaking
+             if (isTaking) {
+                 addGardenPoints(20);
+                 showToast(`💧 รดน้ำต้นไม้ +20%`);
+             }
+
+             return { 
+                 ...med, 
+                 taken: isTaking, 
+                 alertLevel: isTaking ? 0 : med.alertLevel,
+                 totalQuantity: newQuantity
+             };
          }
          return med;
       })
@@ -54,17 +172,9 @@ const App: React.FC = () => {
     alert(`เพิ่มยา "${newMed.name}" เรียบร้อยแล้วค่ะ`);
   };
 
-  // Logic to simulate specific alert stages
   const simulateSpecificAlert = (stage: number) => {
     const now = new Date();
     let minutesOffset = 0;
-
-    // SafetyNet logic relies on: CurrentTime - MedTime
-    // Stage 0: Want diff = -5 (between -10 and 0). So MedTime = Now + 5 min.
-    // Stage 1: Want diff = +16 (>= 15). So MedTime = Now - 16 min.
-    // Stage 2: Want diff = +31 (>= 30). So MedTime = Now - 31 min.
-    // Stage 3: Want diff = +61 (>= 60). So MedTime = Now - 61 min.
-
     if (stage === 0) minutesOffset = 5;
     else if (stage === 1) minutesOffset = -16;
     else if (stage === 2) minutesOffset = -31;
@@ -76,19 +186,15 @@ const App: React.FC = () => {
     setMedications(prev => {
         if (prev.length === 0) return prev;
         const newMeds = [...prev];
-        // Use the first medication for simulation
-        newMeds[0] = {
-            ...newMeds[0],
-            taken: false, // Ensure it's not taken
-            time: timeString,
-            alertLevel: 0 // Reset level so logic picks it up as fresh
-        };
+        newMeds[0] = { ...newMeds[0], taken: false, time: timeString, alertLevel: 0 };
         return newMeds;
     });
+    alert("จำลองสถานะเรียบร้อย");
+  };
 
-    // Provide feedback
-    const stageNames = ["เตรียมตัว (-10 นาที)", "เลย 15 นาที", "เลย 30 นาที", "ฉุกเฉิน (1 ชม.)"];
-    alert(`จำลองสถานะ: ${stageNames[stage]} เรียบร้อยแล้ว \n(ระบบจะแจ้งเตือนในไม่กี่วินาที)`);
+  const simulateLowStock = () => {
+    const med = medications.length > 0 ? medications[0] : INITIAL_MEDICATIONS[0];
+    setLowStockAlert({ ...med, totalQuantity: 3, reorderThreshold: 5 });
   };
 
   const renderView = () => {
@@ -101,15 +207,12 @@ const App: React.FC = () => {
             vitals={vitals}
             onUpdateVitals={updateVitals}
             onToggleMed={toggleMedication} 
+            isCheckedIn={isCheckedIn}
+            onCheckIn={handleCheckIn}
           />
         );
       case 'chat':
-        return (
-          <ChatInterface 
-            history={chatHistory} 
-            setHistory={setChatHistory} 
-          />
-        );
+        return <ChatInterface history={chatHistory} setHistory={setChatHistory} />;
       case 'scan':
         return <ImageUploader />;
       case 'profile':
@@ -117,24 +220,112 @@ const App: React.FC = () => {
           <ProfileView 
             onAddMedication={handleAddMedication} 
             onSimulateStage={simulateSpecificAlert}
+            onSimulateLowStock={simulateLowStock}
+            onSimulateOversleep={simulateOversleep}
             onSaveVoice={setCustomVoiceUrl}
           />
         );
+      case 'garden':
+        return <GardenView garden={garden} />;
       default:
         return <div>View not found</div>;
     }
   };
 
   return (
-    // Use fixed inset-0 and h-[100dvh] for robust mobile layout
     <div className="fixed inset-0 w-full h-[100dvh] bg-slate-50 flex flex-col overflow-hidden">
-      {/* Global Safety Net System (Overlays) */}
+      {/* Toast Notification */}
+      {toastMessage && (
+          <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[110] bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl animate-[fadeIn_0.3s_ease-out] flex items-center font-bold text-lg whitespace-nowrap">
+              {toastMessage}
+          </div>
+      )}
+
       <SafetyNetSystem 
          medications={medications} 
          onUpdateMedication={updateMedication}
          onTakeMedication={toggleMedication}
          customVoiceUrl={customVoiceUrl}
       />
+
+      {/* Low Stock Alert Modal */}
+      {lowStockAlert && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative overflow-hidden text-center animate-[fadeIn_0.2s_ease-out]">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                
+                <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                    <Package size={40} className="text-orange-600" />
+                </div>
+
+                <h3 className="text-2xl font-bold text-slate-800 mb-2">ยาใกล้หมดแล้วค่ะ!</h3>
+                <p className="text-slate-500 text-lg mb-4">
+                    ยา <span className="text-pink-600 font-bold">"{lowStockAlert.commonName || lowStockAlert.name}"</span>
+                </p>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex items-center justify-center space-x-2">
+                    <span className="text-slate-500 font-medium">เหลือเพียง</span>
+                    <span className="text-4xl font-bold text-red-500">{lowStockAlert.totalQuantity}</span>
+                    <span className="text-slate-500 font-medium">เม็ด</span>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={() => setLowStockAlert(null)}
+                        className="w-full bg-orange-500 text-white p-4 rounded-xl font-bold text-xl shadow-lg active:scale-95 transition-all flex items-center justify-center"
+                    >
+                        <ShoppingBag className="mr-2" size={24}/>
+                        รับทราบ / เตรียมเบิกยา
+                    </button>
+                    <button 
+                         onClick={() => setLowStockAlert(null)}
+                         className="text-slate-400 font-bold py-2 hover:bg-slate-50 rounded-xl"
+                    >
+                        ปิดหน้าต่าง
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Morning Check-in Emergency Modal */}
+      {checkInAlertLevel === 'warning' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative text-center animate-[bounce_1s_infinite]">
+                <div className="bg-red-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlarmClock size={48} className="text-red-600 animate-pulse" />
+                </div>
+                
+                <h2 className="text-3xl font-black text-red-600 mb-2">ตื่นสายผิดปกติ!</h2>
+                <p className="text-xl text-slate-700 font-bold mb-4">คุณยายสบายดีไหมคะ? <br/>ไม่มีการเคลื่อนไหวนานแล้ว</p>
+                
+                {autoCallCountdown !== null && (
+                    <div className="bg-red-50 p-4 rounded-2xl border-2 border-red-100 mb-6">
+                        <p className="text-red-800 font-bold flex items-center justify-center mb-2">
+                             <PhoneOutgoing className="mr-2"/> จะโทรหาหลานอัตโนมัติใน
+                        </p>
+                        <div className="text-6xl font-black text-red-600 font-mono">
+                            {autoCallCountdown}
+                        </div>
+                    </div>
+                )}
+
+                <button 
+                    onClick={handleCheckIn}
+                    className="w-full bg-green-500 text-white p-5 rounded-2xl font-bold text-2xl shadow-xl active:scale-95 transition-all mb-3"
+                >
+                    😊 ปลอดภัยดี (กดตรงนี้)
+                </button>
+                
+                <button 
+                    onClick={cancelCheckInAlert}
+                    className="text-slate-400 font-bold py-2 underline"
+                >
+                    ขอโทษทีค่ะ ลืมกด (ยกเลิก)
+                </button>
+             </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 w-full overflow-hidden relative">

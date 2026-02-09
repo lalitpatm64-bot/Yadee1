@@ -31,7 +31,9 @@ export const INITIAL_MEDICATIONS: Medication[] = [
     taken: true,
     type: 'pills',
     color: 'bg-white border-2 border-blue-200',
-    alertLevel: 0
+    alertLevel: 0,
+    totalQuantity: 28,
+    reorderThreshold: 5
   },
   {
     id: '2',
@@ -44,7 +46,9 @@ export const INITIAL_MEDICATIONS: Medication[] = [
     taken: false,
     type: 'pills',
     color: 'bg-white border-2 border-orange-200',
-    alertLevel: 0
+    alertLevel: 0,
+    totalQuantity: 3, // Low stock simulation
+    reorderThreshold: 5
   },
   {
     id: '3',
@@ -57,14 +61,30 @@ export const INITIAL_MEDICATIONS: Medication[] = [
     taken: false,
     type: 'pills',
     color: 'bg-white border-2 border-pink-200',
-    alertLevel: 0
+    alertLevel: 0,
+    totalQuantity: 15,
+    reorderThreshold: 5
   }
 ];
 
 export const MOCK_USER: UserProfile = {
   name: "คุณยายฟ้าคราม",
   age: 77,
-  condition: "ความดันโลหิตสูง, เบาหวาน"
+  condition: "ความดันโลหิตสูง, เบาหวาน",
+  wakeUpTime: "06:00"
 };
 
 export const EMERGENCY_CONTACT = "1669";
+export const CAREGIVER_CONTACT = "0812345678"; // เบอร์หลานสำหรับระบบ Auto-call
+
+// --- ACCESSIBILITY HELPER ---
+export const speakText = (text: string) => {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel(); // Stop previous audio
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'th-TH';
+    utterance.rate = 0.9; // Slightly slower for elderly
+    utterance.volume = 1.0;
+    window.speechSynthesis.speak(utterance);
+  }
+};

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
 import { sendChatMessage } from '../services/geminiService';
-import { Send, Phone, Mic, User, Bot } from 'lucide-react';
-import { EMERGENCY_CONTACT } from '../constants';
+import { Send, Phone, Mic, User, Bot, Volume2 } from 'lucide-react';
+import { EMERGENCY_CONTACT, speakText } from '../constants';
 
 interface Props {
   history: ChatMessage[];
@@ -64,6 +64,7 @@ const ChatInterface: React.FC<Props> = ({ history, setHistory }) => {
             };
             setHistory(prev => [...prev, emergencyResponse]);
             setLoading(false);
+            speakText("ฉุกเฉินค่ะ อาการไม่ค่อยดี โปรดโทร 1669 เดี๋ยวนี้เลยนะคะ");
         }, 500);
         return;
     }
@@ -91,10 +92,10 @@ const ChatInterface: React.FC<Props> = ({ history, setHistory }) => {
   };
 
   return (
-    // pb-20 accounts for the bottom Navigation height (h-20)
-    <div className="flex flex-col h-full bg-slate-50 relative pb-20">
+    // pb-28 accounts for the bottom Navigation height (h-24 approx) plus spacing
+    <div className="flex flex-col h-full bg-slate-50 relative pb-28">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
+      <div className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm flex-none">
         <div className="flex items-center space-x-3">
            <div className="bg-pink-100 p-2 rounded-full">
                 <Bot size={24} className="text-pink-600" />
@@ -110,30 +111,45 @@ const ChatInterface: React.FC<Props> = ({ history, setHistory }) => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      {/* Added min-h-0 to fix flexbox scrolling overflow issues */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
         {history.length === 0 && (
              <div className="text-center mt-10 text-slate-400 p-6 bg-slate-100 rounded-3xl mx-4">
                 <p className="text-xl font-bold text-slate-600 mb-2">สวัสดีค่ะ 🙏</p>
                 <p className="text-lg">มีอาการอะไรบอกหนูได้เลยนะคะ</p>
                 <p className="text-base mt-2 opacity-75">เช่น "ลืมกินยา" หรือ "เวียนหัว"</p>
+                <button onClick={() => speakText("สวัสดีค่ะ มีอาการอะไรบอกหนูได้เลยนะคะ")} className="mt-4 bg-white p-3 rounded-full text-pink-500 shadow-sm border border-pink-100">
+                    <Volume2 size={24} />
+                </button>
              </div>
         )}
         
         {history.map((msg) => (
           <div
             key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
           >
-            <div
-              className={`max-w-[85%] p-5 rounded-3xl text-lg leading-relaxed shadow-sm whitespace-pre-line ${
-                msg.role === 'user'
-                  ? 'bg-pink-500 text-white rounded-br-none'
-                  : msg.isEmergency 
-                    ? 'bg-red-50 border-2 border-red-500 text-red-900 rounded-bl-none'
-                    : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
-              }`}
-            >
-              {msg.text}
+            <div className={`flex items-end gap-2 max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div
+                    className={`p-5 rounded-3xl text-lg leading-relaxed shadow-sm whitespace-pre-line ${
+                        msg.role === 'user'
+                        ? 'bg-pink-500 text-white rounded-br-none'
+                        : msg.isEmergency 
+                            ? 'bg-red-50 border-2 border-red-500 text-red-900 rounded-bl-none'
+                            : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
+                    }`}
+                >
+                    {msg.text}
+                </div>
+                
+                {/* Speaker Button for messages */}
+                <button 
+                    onClick={() => speakText(msg.text)}
+                    className="p-2 bg-slate-200 rounded-full text-slate-500 hover:bg-slate-300 active:scale-95 flex-none"
+                    aria-label="Listen to message"
+                >
+                    <Volume2 size={20} />
+                </button>
             </div>
           </div>
         ))}
@@ -150,7 +166,7 @@ const ChatInterface: React.FC<Props> = ({ history, setHistory }) => {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t border-slate-200 z-20">
+      <div className="bg-white border-t border-slate-200 z-20 flex-none">
         {/* Suggested Chips */}
         <div className="px-4 py-3 flex gap-2 overflow-x-auto no-scrollbar bg-slate-50 border-b border-slate-100">
             {SUGGESTED_QUESTIONS.map((text) => (
