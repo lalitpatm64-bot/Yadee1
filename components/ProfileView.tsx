@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { User, Plus, Pill, Clock, FileText, Activity, Save, BellRing } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, Plus, Pill, Clock, FileText, Activity, Save, BellRing, Mic, Square, Play, Trash2 } from 'lucide-react';
 import { Medication } from '../types';
 import { MOCK_USER } from '../constants';
 
 interface Props {
   onAddMedication: (med: Medication) => void;
-  onSimulateAlert?: () => void; // Optional prop for testing
+  onSimulateAlert?: () => void;
+  onSaveVoice?: (blobUrl: string | null) => void;
 }
 
-const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
+const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert, onSaveVoice }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -16,6 +17,18 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
     time: '',
     instruction: ''
   });
+
+  // Global Voice Recording State (Profile Level)
+  const [isRecordingGlobal, setIsRecordingGlobal] = useState(false);
+  const [recordedUrlGlobal, setRecordedUrlGlobal] = useState<string | null>(null);
+  const mediaRecorderGlobalRef = useRef<MediaRecorder | null>(null);
+  const audioChunksGlobalRef = useRef<Blob[]>([]);
+
+  // Specific Medication Voice Recording State
+  const [isRecordingMed, setIsRecordingMed] = useState(false);
+  const [recordedUrlMed, setRecordedUrlMed] = useState<string | null>(null);
+  const mediaRecorderMedRef = useRef<MediaRecorder | null>(null);
+  const audioChunksMedRef = useRef<Blob[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -34,14 +47,101 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
       instruction: formData.instruction || 'ตามแพทย์สั่ง',
       taken: false,
       type: 'pills',
-      color: 'bg-white border-2 border-pink-200'
+      color: 'bg-white border-2 border-pink-200',
+      customAlertVoice: recordedUrlMed || undefined
     };
 
     onAddMedication(newMed);
     
-    // Reset form
     setFormData({ name: '', dosage: '', time: '', instruction: '' });
+    setRecordedUrlMed(null);
     setIsFormVisible(false);
+  };
+
+  // --- Global Recorder Logic ---
+  const startRecordingGlobal = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderGlobalRef.current = mediaRecorder;
+      audioChunksGlobalRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksGlobalRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksGlobalRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setRecordedUrlGlobal(audioUrl);
+        if (onSaveVoice) onSaveVoice(audioUrl);
+      };
+
+      mediaRecorder.start();
+      setIsRecordingGlobal(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('กรุณาอนุญาตให้ใช้ไมโครโฟนเพื่อบันทึกเสียงนะคะ');
+    }
+  };
+
+  const stopRecordingGlobal = () => {
+    if (mediaRecorderGlobalRef.current && isRecordingGlobal) {
+      mediaRecorderGlobalRef.current.stop();
+      setIsRecordingGlobal(false);
+      mediaRecorderGlobalRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const playRecordingGlobal = () => {
+    if (recordedUrlGlobal) new Audio(recordedUrlGlobal).play();
+  };
+
+  const deleteRecordingGlobal = () => {
+    setRecordedUrlGlobal(null);
+    if (onSaveVoice) onSaveVoice(null);
+  };
+
+  // --- Medication Specific Recorder Logic ---
+  const startRecordingMed = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderMedRef.current = mediaRecorder;
+      audioChunksMedRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksMedRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksMedRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setRecordedUrlMed(audioUrl);
+      };
+
+      mediaRecorder.start();
+      setIsRecordingMed(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('กรุณาอนุญาตให้ใช้ไมโครโฟนเพื่อบันทึกเสียงนะคะ');
+    }
+  };
+
+  const stopRecordingMed = () => {
+    if (mediaRecorderMedRef.current && isRecordingMed) {
+      mediaRecorderMedRef.current.stop();
+      setIsRecordingMed(false);
+      mediaRecorderMedRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const playRecordingMed = () => {
+    if (recordedUrlMed) new Audio(recordedUrlMed).play();
+  };
+
+  const deleteRecordingMed = () => {
+    setRecordedUrlMed(null);
   };
 
   return (
@@ -54,6 +154,63 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-800">{MOCK_USER.name}</h2>
           <p className="text-lg text-slate-500">อายุ {MOCK_USER.age} ปี</p>
+        </div>
+      </div>
+
+      {/* Voice Recorder Section (Global) */}
+      <div className="w-full bg-gradient-to-br from-purple-500 to-indigo-600 p-6 rounded-3xl shadow-lg text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+        
+        <h3 className="text-xl font-bold mb-2 flex items-center">
+            <Mic className="mr-2" size={24} />
+            เสียงเตือนทั่วไป (เสียงกลาง)
+        </h3>
+        <p className="text-purple-100 mb-6 text-sm">
+            บันทึกเสียงกลางสำหรับใช้เตือนทุกยา (หากไม่ได้ระบุเฉพาะเจาะจง)
+        </p>
+
+        <div className="flex items-center justify-between gap-4">
+            {!isRecordingGlobal && !recordedUrlGlobal && (
+                <button 
+                    onClick={startRecordingGlobal}
+                    className="flex-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm p-4 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-95"
+                >
+                    <div className="bg-red-500 p-3 rounded-full mb-2 shadow-lg animate-pulse">
+                        <Mic size={24} className="text-white" />
+                    </div>
+                    <span className="font-bold">กดเพื่ออัดเสียงกลาง</span>
+                </button>
+            )}
+
+            {isRecordingGlobal && (
+                <button 
+                    onClick={stopRecordingGlobal}
+                    className="flex-1 bg-red-500 hover:bg-red-600 p-4 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-95"
+                >
+                    <div className="bg-white p-3 rounded-full mb-2 shadow-sm animate-bounce">
+                        <Square size={24} className="text-red-500 fill-current" />
+                    </div>
+                    <span className="font-bold">กดเพื่อหยุด</span>
+                </button>
+            )}
+
+            {recordedUrlGlobal && (
+                <div className="flex-1 flex gap-2">
+                    <button 
+                        onClick={playRecordingGlobal}
+                        className="flex-1 bg-white text-purple-600 p-4 rounded-2xl flex flex-col items-center justify-center shadow-lg active:scale-95"
+                    >
+                        <Play size={32} className="fill-current mb-1" />
+                        <span className="text-xs font-bold">ฟังเสียง</span>
+                    </button>
+                    <button 
+                        onClick={deleteRecordingGlobal}
+                        className="w-16 bg-red-400/20 hover:bg-red-400/30 text-white p-2 rounded-2xl flex items-center justify-center"
+                    >
+                        <Trash2 size={24} />
+                    </button>
+                </div>
+            )}
         </div>
       </div>
 
@@ -70,7 +227,6 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
       <div className="w-full bg-red-50 p-6 rounded-3xl border border-red-100">
         <h3 className="text-xl font-bold text-red-700 mb-2">เบอร์ฉุกเฉิน</h3>
         <p className="text-3xl font-bold text-red-600">1669</p>
-        <p className="text-slate-500 mt-2">ลูกสาว (นุ่น): 081-234-5678</p>
       </div>
 
       {/* Add Medication Section */}
@@ -134,6 +290,7 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
                 </div>
             </div>
 
+            {/* Instruction */}
             <div className="space-y-2">
               <label className="text-slate-700 font-bold flex items-center text-lg">
                 <FileText size={20} className="mr-2 text-pink-500"/> คำแนะนำ
@@ -147,12 +304,58 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateAlert }) => {
               />
             </div>
 
+            {/* Specific Voice Recorder */}
+            <div className="bg-pink-50 p-4 rounded-xl border border-pink-100">
+                <label className="text-pink-800 font-bold flex items-center text-base mb-2">
+                    <Mic size={18} className="mr-2"/> เสียงเตือนเฉพาะยานี้ (เลือกได้)
+                </label>
+                <div className="flex items-center gap-2">
+                    {!isRecordingMed && !recordedUrlMed && (
+                        <button 
+                            type="button"
+                            onClick={startRecordingMed}
+                            className="flex-1 bg-white text-pink-600 border border-pink-200 py-3 rounded-xl font-bold text-sm shadow-sm hover:bg-pink-50"
+                        >
+                           กดเพื่ออัดเสียง (เช่น "กินยาเบาหวานนะ")
+                        </button>
+                    )}
+                    {isRecordingMed && (
+                        <button 
+                            type="button"
+                            onClick={stopRecordingMed}
+                            className="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold text-sm animate-pulse"
+                        >
+                           กำลังอัด... (กดเพื่อหยุด)
+                        </button>
+                    )}
+                    {recordedUrlMed && (
+                        <div className="flex-1 flex gap-2">
+                             <button 
+                                type="button" 
+                                onClick={playRecordingMed}
+                                className="flex-1 bg-green-500 text-white py-2 rounded-xl text-sm font-bold flex items-center justify-center"
+                            >
+                                <Play size={16} className="mr-1"/> ฟัง
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={deleteRecordingMed}
+                                className="w-10 bg-red-100 text-red-500 rounded-xl flex items-center justify-center"
+                            >
+                                <Trash2 size={16}/>
+                            </button>
+                        </div>
+                    )}
+                </div>
+                {recordedUrlMed && <p className="text-xs text-green-600 mt-2 font-medium">✓ บันทึกเสียงเฉพาะยาเรียบร้อยแล้ว</p>}
+            </div>
+
             <button 
                 type="submit"
                 className="w-full bg-pink-500 text-white p-4 rounded-xl font-bold text-xl mt-4 shadow-md flex items-center justify-center active:bg-pink-600 active:scale-95 transition-all"
             >
                 <Save className="mr-2" size={24} />
-                บันทึก
+                บันทึกข้อมูล
             </button>
           </form>
         )}

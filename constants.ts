@@ -56,8 +56,8 @@ export const INITIAL_MEDICATIONS: Medication[] = [
 ];
 
 export const MOCK_USER: UserProfile = {
-  name: "คุณยายสมศรี",
-  age: 72,
+  name: "คุณยายฟ้าคราม",
+  age: 77,
   condition: "ความดันโลหิตสูง, เบาหวาน"
 };
 

@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [currentView, setView] = useState<ViewState>('home');
   const [medications, setMedications] = useState<Medication[]>(INITIAL_MEDICATIONS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [customVoiceUrl, setCustomVoiceUrl] = useState<string | null>(null);
   
   // New State for Vitals
   const [vitals, setVitals] = useState<VitalSigns>({
@@ -56,8 +57,8 @@ const App: React.FC = () => {
   // Logic to simulate a missed dose for demonstration/testing
   const simulateMissedDose = () => {
     const now = new Date();
-    // Set time to 5 minutes ago to trigger Stage 1 alert immediately
-    const pastTime = new Date(now.getTime() - 5 * 60000); 
+    // Set time to 16 minutes ago to trigger Stage 1 (15 min) alert immediately
+    const pastTime = new Date(now.getTime() - 16 * 60000); 
     const timeString = `${pastTime.getHours().toString().padStart(2, '0')}:${pastTime.getMinutes().toString().padStart(2, '0')}`;
 
     setMedications(prev => {
@@ -72,7 +73,7 @@ const App: React.FC = () => {
         };
         return newMeds;
     });
-    alert("ระบบกำลังจำลองสถานการณ์: ลืมทานยาเมื่อ 5 นาทีที่แล้ว...");
+    alert("ระบบกำลังจำลองสถานการณ์: ลืมทานยาเมื่อ 16 นาทีที่แล้ว... (รอสักครู่ระบบจะแจ้งเตือน)");
   };
 
   const renderView = () => {
@@ -101,6 +102,7 @@ const App: React.FC = () => {
           <ProfileView 
             onAddMedication={handleAddMedication} 
             onSimulateAlert={simulateMissedDose}
+            onSaveVoice={setCustomVoiceUrl}
           />
         );
       default:
@@ -116,6 +118,7 @@ const App: React.FC = () => {
          medications={medications} 
          onUpdateMedication={updateMedication}
          onTakeMedication={toggleMedication}
+         customVoiceUrl={customVoiceUrl}
       />
 
       {/* Main Content Area */}

@@ -2,6 +2,7 @@
   "name": "Copy of ElderMed Companion",
   "description": "An AI-powered companion for elderly patients to manage medications and health.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }

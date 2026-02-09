@@ -8,6 +8,7 @@ export interface Medication {
   type: 'pills' | 'liquid' | 'injection';
   color?: string;
   alertLevel?: 0 | 1 | 2 | 3; // 0=None, 1=User, 2=Caregiver, 3=Emergency
+  customAlertVoice?: string; // URL/Blob for specific medication alert
 }
 
 export interface ChatMessage {
