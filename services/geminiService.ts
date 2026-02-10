@@ -264,3 +264,44 @@ export const generateDailyReport = async (
     return "แม่สบายดีจ้ะ กินยาครบแล้ว รักลูกนะ";
   }
 };
+
+export const parseAppointmentCard = async (base64Image: string): Promise<any> => {
+  try {
+    const ai = getAI();
+    const modelId = 'gemini-2.5-flash-latest';
+    
+    const prompt = `
+      Task: Extract medical appointment details from the image (Thai Appointment Card).
+      Return JSON ONLY.
+      
+      Fields:
+      - title: Clinic/Department name (e.g. "แผนกอายุรกรรม", "นัดเจาะเลือด")
+      - date: YYYY-MM-DD (Convert Thai year if needed, e.g. 2567 -> 2024)
+      - time: HH:mm (24hr format)
+      - location: Hospital name or Room number
+      - doctor: Doctor name (optional)
+      
+      If unable to find date, use tomorrow's date.
+      JSON Format: { "title": string, "date": string, "time": string, "location": string, "doctor": string }
+    `;
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: modelId,
+      contents: {
+        parts: [
+          { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+          { text: prompt }
+        ]
+      },
+      config: { responseMimeType: 'application/json' }
+    });
+
+    if (response.text) {
+        return JSON.parse(response.text);
+    }
+    return null;
+  } catch (error) {
+    console.error("Gemini Appointment Error:", error);
+    return null;
+  }
+};

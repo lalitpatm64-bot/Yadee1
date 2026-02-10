@@ -5,15 +5,17 @@ import ChatInterface from './components/ChatInterface';
 import ImageUploader from './components/ImageUploader';
 import ProfileView from './components/ProfileView';
 import SafetyNetSystem from './components/SafetyNetSystem';
-import { ViewState, ChatMessage, Medication, VitalSigns } from './types';
+import CalendarView from './components/CalendarView';
+import { ViewState, ChatMessage, Medication, VitalSigns, Appointment } from './types';
 import { INITIAL_MEDICATIONS, MOCK_USER, CAREGIVER_CONTACT } from './constants';
-import { Package, AlertTriangle, X, ShoppingBag, AlarmClock, PhoneOutgoing } from 'lucide-react';
+import { Package, AlarmClock, PhoneOutgoing, ShoppingBag } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setView] = useState<ViewState>('home');
   const [medications, setMedications] = useState<Medication[]>(INITIAL_MEDICATIONS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [customVoiceUrl, setCustomVoiceUrl] = useState<string | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   
   // New State for Vitals
   const [vitals, setVitals] = useState<VitalSigns>({
@@ -130,6 +132,10 @@ const App: React.FC = () => {
     alert(`เพิ่มยา "${newMed.name}" เรียบร้อยแล้วค่ะ`);
   };
 
+  const handleAddAppointment = (newApt: Appointment) => {
+      setAppointments(prev => [...prev, newApt]);
+  };
+
   const simulateSpecificAlert = (stage: number) => {
     const now = new Date();
     let minutesOffset = 0;
@@ -168,6 +174,13 @@ const App: React.FC = () => {
             isCheckedIn={isCheckedIn}
             onCheckIn={handleCheckIn}
           />
+        );
+      case 'calendar':
+        return (
+            <CalendarView 
+                appointments={appointments} 
+                onAddAppointment={handleAddAppointment}
+            />
         );
       case 'chat':
         return <ChatInterface history={chatHistory} setHistory={setChatHistory} />;
@@ -247,7 +260,7 @@ const App: React.FC = () => {
       {/* Morning Check-in Emergency Modal */}
       {checkInAlertLevel === 'warning' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
-             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative text-center animate-[bounce_1s_infinite]">
+             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative text-center">
                 <div className="bg-red-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4">
                     <AlarmClock size={48} className="text-red-600 animate-pulse" />
                 </div>

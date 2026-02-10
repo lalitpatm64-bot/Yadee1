@@ -39,13 +39,23 @@ export interface VitalSigns {
   lastUpdated: Date;
 }
 
-export type ViewState = 'home' | 'chat' | 'scan' | 'profile';
+export type ViewState = 'home' | 'chat' | 'scan' | 'calendar' | 'profile';
 
 export interface UserProfile {
   name: string;
   age: number;
   condition: string;
   wakeUpTime?: string; // e.g., "06:00"
+}
+
+export interface Appointment {
+  id: string;
+  title: string; // e.g. "นัดหมอหัวใจ"
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  location: string;
+  doctor?: string;
+  type: 'checkup' | 'lab' | 'other';
 }
 
 export interface GardenState {

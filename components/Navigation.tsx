@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, MessageCircle, ScanFace, User } from 'lucide-react';
+import { Home, MessageCircle, ScanFace, User, Calendar } from 'lucide-react';
 import { ViewState } from '../types';
 import { speakText } from '../constants';
 
@@ -10,10 +10,11 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
   const navItems: { id: ViewState; label: string; icon: React.ReactNode, voiceLabel: string }[] = [
-    { id: 'home', label: 'กินยา', icon: <Home size={28} />, voiceLabel: 'หน้าหลัก กินยา' },
-    { id: 'chat', label: 'คุยกับหมอ', icon: <MessageCircle size={28} />, voiceLabel: 'คุยกับหมอเอไอ' },
-    { id: 'scan', label: 'สแกน', icon: <ScanFace size={28} />, voiceLabel: 'สแกนยาหรืออาหาร' },
-    { id: 'profile', label: 'ตั้งค่า', icon: <User size={28} />, voiceLabel: 'ข้อมูลส่วนตัว' },
+    { id: 'home', label: 'กินยา', icon: <Home size={24} />, voiceLabel: 'หน้าหลัก กินยา' },
+    { id: 'calendar', label: 'ตารางนัด', icon: <Calendar size={24} />, voiceLabel: 'ตารางนัดและประวัติสุขภาพ' },
+    { id: 'scan', label: 'สแกน', icon: <ScanFace size={24} />, voiceLabel: 'สแกนยาหรืออาหาร' },
+    { id: 'chat', label: 'คุยหมอ', icon: <MessageCircle size={24} />, voiceLabel: 'คุยกับหมอเอไอ' },
+    { id: 'profile', label: 'ตั้งค่า', icon: <User size={24} />, voiceLabel: 'ข้อมูลส่วนตัว' },
   ];
 
   return (
@@ -40,7 +41,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
                 {item.icon}
               </div>
               <span 
-                className={`text-sm font-bold transition-all duration-300 ${
+                className={`text-xs font-bold transition-all duration-300 ${
                   isActive ? 'text-pink-600 opacity-100' : 'text-slate-400 opacity-70 scale-90'
                 }`}
               >

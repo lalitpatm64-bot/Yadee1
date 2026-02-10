@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User, Plus, Pill, Clock, FileText, Activity, Save, BellRing, Mic, Square, Play, Trash2, Tag, Eye, Presentation, Package, AlertCircle, Sun, X } from 'lucide-react';
+import { User, Plus, Pill, Clock, FileText, Activity, Save, BellRing, Mic, Square, Play, Trash2, Tag, Eye, Presentation, Package, AlertCircle, Sun, X, Camera } from 'lucide-react';
 import { Medication } from '../types';
 import { MOCK_USER } from '../constants';
 
@@ -112,13 +112,21 @@ const ProfileView: React.FC<Props> = ({ onAddMedication, onSimulateStage, onSimu
     <div className="p-6 pb-32 space-y-6 overflow-y-auto h-full bg-slate-50">
       {/* Profile Header */}
       <div className="flex flex-col items-center space-y-4 pt-4">
-        <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center text-pink-500 shadow-lg border-4 border-pink-100">
-          <User size={64} />
+        <div className="w-36 h-36 rounded-full overflow-hidden shadow-2xl border-4 border-pink-200 relative group cursor-pointer active:scale-95 transition-all">
+          <img 
+            src="https://images.unsplash.com/photo-1581579438747-1dc8d17bbce4?q=80&w=400&h=400&auto=format&fit=crop" 
+            alt="Profile" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <Camera className="text-white drop-shadow-md" size={32} />
+          </div>
         </div>
+        
         <div className="text-center">
           <h2 className="text-3xl font-bold text-slate-800">{MOCK_USER.name}</h2>
           <div className="flex items-center justify-center mt-2 space-x-2">
-            <span className="bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-sm font-bold">อายุ {MOCK_USER.age} ปี</span>
+            <span className="bg-pink-100 text-pink-600 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm">อายุ {MOCK_USER.age} ปี</span>
           </div>
         </div>
       </div>
