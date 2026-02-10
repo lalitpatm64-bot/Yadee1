@@ -2,17 +2,25 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from '../constants';
 import { ChatMessage, UserProfile, Medication, VitalSigns } from '../types';
 
-// Initialize Gemini
-// NOTE: We assume process.env.API_KEY is available.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to safely get AI instance
+const getAI = () => {
+  // We initialize here to prevent app crash if process.env is accessed at module level in some environments
+  try {
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  } catch (error) {
+    console.error("Failed to initialize GoogleGenAI", error);
+    throw new Error("API Key configuration error");
+  }
+};
 
 export const sendChatMessage = async (
   history: ChatMessage[],
   newMessage: string
 ): Promise<string> => {
   try {
-    // SWITCH TO STABLE MODEL: gemini-2.0-flash-exp is currently more reliable for real-time chat
-    const modelId = 'gemini-2.0-flash-exp';
+    const ai = getAI();
+    // Use gemini-3-flash-preview for chat as it is optimized for low latency text
+    const modelId = 'gemini-3-flash-preview';
     
     // OPTIMIZATION: Limit history to last 6 messages
     const recentHistory = history.slice(-6);
@@ -33,15 +41,13 @@ export const sendChatMessage = async (
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
-      contents: {
-        parts: [{ text: prompt }]
-      }
+      contents: prompt, // Pass string directly for simple text generation
     });
 
     return response.text || "ขออภัยครับ หมอ AI กำลังเรียบเรียงคำพูด ลองถามใหม่อีกครั้งนะครับ";
   } catch (error) {
     console.error("Gemini Chat Error:", error);
-    return "ขออภัยค่ะ สัญญาณอินเทอร์เน็ตหรือระบบอาจมีปัญหา ลองกดส่งใหม่อีกครั้งนะคะ";
+    return "ขออภัยค่ะ ระบบกำลังปรับปรุงสัญญาณอินเทอร์เน็ต ลองกดส่งใหม่อีกครั้งนะคะ (Error: Chat)";
   }
 };
 
@@ -50,8 +56,9 @@ export const analyzeMedicalImage = async (
   userPrompt: string = "ช่วยดูยาตัวนี้ให้หน่อยค่ะ ว่าคือยาอะไร และต้องกินยังไง"
 ): Promise<string> => {
   try {
-    // Use gemini-2.0-flash-exp for reliable vision analysis
-    const modelId = 'gemini-2.0-flash-exp';
+    const ai = getAI();
+    // Use gemini-2.5-flash-latest for stable multimodal capabilities
+    const modelId = 'gemini-2.5-flash-latest';
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
@@ -73,7 +80,7 @@ export const analyzeMedicalImage = async (
     return response.text || "ไม่สามารถวิเคราะห์รูปภาพได้ค่ะ ลองถ่ายใหม่ให้ชัดขึ้นนะคะ";
   } catch (error) {
     console.error("Gemini Vision Error:", error);
-    return "ขออภัยค่ะ ระบบไม่สามารถดูรูปภาพได้ในขณะนี้";
+    return "ขออภัยค่ะ ระบบไม่สามารถดูรูปภาพได้ในขณะนี้ (Error: Vision)";
   }
 };
 
@@ -82,8 +89,8 @@ export const analyzeFoodImage = async (
   userProfile: UserProfile
 ): Promise<string> => {
   try {
-    // Use gemini-2.0-flash-exp for reliable vision analysis
-    const modelId = 'gemini-2.0-flash-exp';
+    const ai = getAI();
+    const modelId = 'gemini-2.5-flash-latest';
 
     const prompt = `
       Role: Nutritionist for elderly patient.
@@ -129,8 +136,8 @@ export const verifyPill = async (
   appearance: string
 ): Promise<{ isMatch: boolean; reason: string }> => {
   try {
-    // Use gemini-2.0-flash-exp for reliable vision analysis
-    const modelId = 'gemini-2.0-flash-exp';
+    const ai = getAI();
+    const modelId = 'gemini-2.5-flash-latest';
     const prompt = `
       Task: Verify if the medication in the image matches the expected description.
       Expected Medication: "${medName}"
@@ -170,8 +177,8 @@ export const verifyPill = async (
 
 export const analyzeFaceHealth = async (base64Image: string): Promise<string> => {
   try {
-    // Use gemini-2.0-flash-exp for reliable vision analysis
-    const modelId = 'gemini-2.0-flash-exp';
+    const ai = getAI();
+    const modelId = 'gemini-2.5-flash-latest';
 
     const prompt = `
       Role: Friendly AI Health Companion.
@@ -222,8 +229,8 @@ export const generateDailyReport = async (
   mood: string
 ): Promise<string> => {
   try {
-    // Switch to stable model
-    const modelId = 'gemini-2.0-flash-exp';
+    const ai = getAI();
+    const modelId = 'gemini-3-flash-preview';
     
     const takenCount = medications.filter(m => m.taken).length;
     const totalCount = medications.length;
@@ -248,9 +255,7 @@ export const generateDailyReport = async (
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
-      contents: {
-        parts: [{ text: prompt }]
-      }
+      contents: prompt,
     });
 
     return response.text || "แม่สบายดีจ้ะ กินยาครบแล้ว รักลูกนะ";
