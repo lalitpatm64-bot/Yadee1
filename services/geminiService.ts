@@ -11,7 +11,8 @@ export const sendChatMessage = async (
   newMessage: string
 ): Promise<string> => {
   try {
-    const modelId = 'gemini-3-flash-preview';
+    // SWITCH TO STABLE MODEL: gemini-2.0-flash-exp is currently more reliable for real-time chat
+    const modelId = 'gemini-2.0-flash-exp';
     
     // OPTIMIZATION: Limit history to last 6 messages
     const recentHistory = history.slice(-6);
@@ -32,13 +33,15 @@ export const sendChatMessage = async (
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
-      contents: prompt,
+      contents: {
+        parts: [{ text: prompt }]
+      }
     });
 
-    return response.text || "ขออภัยครับ ระบบขัดข้องชั่วคราว (System Error)";
+    return response.text || "ขออภัยครับ หมอ AI กำลังเรียบเรียงคำพูด ลองถามใหม่อีกครั้งนะครับ";
   } catch (error) {
     console.error("Gemini Chat Error:", error);
-    return "ขออภัยค่ะ มีปัญหาในการเชื่อมต่อ โปรดลองใหม่อีกครั้งนะคะ";
+    return "ขออภัยค่ะ สัญญาณอินเทอร์เน็ตหรือระบบอาจมีปัญหา ลองกดส่งใหม่อีกครั้งนะคะ";
   }
 };
 
@@ -219,7 +222,8 @@ export const generateDailyReport = async (
   mood: string
 ): Promise<string> => {
   try {
-    const modelId = 'gemini-3-flash-preview';
+    // Switch to stable model
+    const modelId = 'gemini-2.0-flash-exp';
     
     const takenCount = medications.filter(m => m.taken).length;
     const totalCount = medications.length;
@@ -244,7 +248,9 @@ export const generateDailyReport = async (
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
-      contents: prompt,
+      contents: {
+        parts: [{ text: prompt }]
+      }
     });
 
     return response.text || "แม่สบายดีจ้ะ กินยาครบแล้ว รักลูกนะ";
