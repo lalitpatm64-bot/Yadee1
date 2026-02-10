@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Medication, UserProfile, VitalSigns } from '../types';
-import { CheckCircle, Circle, Sun, Moon, Coffee, Phone, Activity, Heart, Edit3, X, Save, Pill, Info, Share2, Sparkles, Smile, Meh, Frown, Copy, Package, Sunrise, ChevronRight, AlertCircle, Volume2 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { generateDailyReport } from '../services/geminiService';
+import { CheckCircle, Circle, Sun, Moon, Coffee, Phone, Activity, Edit3, X, Save, Pill, Share2, Sparkles, Smile, Meh, Frown, Copy, Sunrise, ChevronRight, AlertCircle, Volume2, Camera, RefreshCcw, ScanLine, AlertTriangle, Loader2 } from 'lucide-react';
+import { generateDailyReport, verifyPill } from '../services/geminiService';
 import { speakText } from '../constants';
 
 interface Props {
@@ -10,14 +9,25 @@ interface Props {
   medications: Medication[];
   vitals: VitalSigns;
   onUpdateVitals: (vitals: Partial<VitalSigns>) => void;
-  onToggleMed: (id: string) => void;
+  onToggleMed: (id: string, photo?: string) => void;
   isCheckedIn: boolean; 
   onCheckIn: () => void; 
 }
 
 const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpdateVitals, onToggleMed, isCheckedIn, onCheckIn }) => {
   const [editingVital, setEditingVital] = useState<'pressure' | 'sugar' | null>(null);
-  const [confirmMed, setConfirmMed] = useState<Medication | null>(null);
+  
+  // State for "Photo Proof" Modal
+  const [activeMedForCamera, setActiveMedForCamera] = useState<Medication | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{isMatch: boolean, reason: string} | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // State for Viewing Taken Photo
+  const [viewingPhotoMed, setViewingPhotoMed] = useState<Medication | null>(null);
+
   const [mood, setMood] = useState<string>('Happy');
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportText, setReportText] = useState<string | null>(null);
@@ -30,17 +40,98 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
   const totalCount = medications.length;
   const percentage = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
-  const data = [
-    { name: 'Taken', value: takenCount },
-    { name: 'Remaining', value: totalCount - takenCount },
-  ];
-  const COLORS = ['#EC4899', '#F1F5F9']; 
-
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "อรุณสวัสดิ์";
     if (hour < 16) return "สวัสดีตอนบ่าย";
     return "สวัสดีตอนเย็น";
+  };
+
+  // --- CAMERA LOGIC ---
+  const startCamera = async (med: Medication) => {
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          setCameraStream(stream);
+          setActiveMedForCamera(med);
+          setVerificationResult(null);
+          setPendingPhoto(null);
+          speakText(`ถ่ายรูปยา ${med.commonName} ในมือ เพื่อกันลืมนะคะ`);
+      } catch (e) {
+          alert("ไม่สามารถเปิดกล้องได้");
+          // Fallback if camera fails: just toggle without photo
+          onToggleMed(med.id);
+      }
+  };
+
+  const stopCamera = () => {
+      if (cameraStream) {
+          cameraStream.getTracks().forEach(track => track.stop());
+          setCameraStream(null);
+      }
+      setActiveMedForCamera(null);
+      setVerificationResult(null);
+      setPendingPhoto(null);
+  };
+
+  const capturePhoto = async () => {
+      if (videoRef.current && activeMedForCamera) {
+          const canvas = document.createElement('canvas');
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+          const photoBase64 = canvas.toDataURL('image/jpeg', 0.5);
+          const base64Data = photoBase64.split(',')[1];
+
+          setPendingPhoto(photoBase64);
+          
+          // Start AI Verification
+          setIsVerifying(true);
+          speakText("กำลังให้เอไอช่วยดูยานะคะ รอสักครู่");
+          
+          const result = await verifyPill(base64Data, activeMedForCamera.name, activeMedForCamera.appearance || "ยา");
+          
+          setIsVerifying(false);
+          setVerificationResult(result);
+          
+          if (result.isMatch) {
+              speakText("ยาถูกต้องค่ะ เก่งมาก กดปุ่มยืนยันได้เลย");
+          } else {
+              speakText("เอไอสงสัยว่ายาอาจจะไม่ตรง ลองตรวจสอบอีกครั้งนะคะ");
+          }
+      }
+  };
+  
+  const confirmTaken = () => {
+      if (activeMedForCamera && pendingPhoto) {
+          onToggleMed(activeMedForCamera.id, pendingPhoto);
+          speakText("บันทึกการกินยาเรียบร้อยค่ะ");
+          stopCamera();
+      }
+  };
+
+  const retryPhoto = () => {
+      setVerificationResult(null);
+      setPendingPhoto(null);
+      speakText("ถ่ายใหม่นะคะ");
+  };
+
+  const handleMedClick = (med: Medication) => {
+      if (med.taken) {
+          // If already taken, show the photo or ask to undo
+          setViewingPhotoMed(med);
+          speakText(`ยานี้กินไปแล้วเมื่อกี้ค่ะ`);
+      } else {
+          // Open camera to take
+          startCamera(med);
+      }
+  };
+
+  const handleUndoTaken = () => {
+      if (viewingPhotoMed) {
+          onToggleMed(viewingPhotoMed.id); // Toggle back to false
+          setViewingPhotoMed(null);
+          speakText("ยกเลิกการกินยาแล้วค่ะ");
+      }
   };
 
   const handleSaveVitals = () => {
@@ -57,16 +148,6 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
         speakText(`บันทึกค่าน้ำตาล ${tempSugar} เรียบร้อยแล้วค่ะ`);
     }
     setEditingVital(null);
-  };
-
-  const handleConfirmToggle = () => {
-    if (confirmMed) {
-        onToggleMed(confirmMed.id);
-        if (!confirmMed.taken) {
-            speakText(`เก่งมากค่ะ ทานยา${confirmMed.commonName || confirmMed.name} เรียบร้อยแล้ว`);
-        }
-        setConfirmMed(null);
-    }
   };
 
   const handleGenerateReport = async () => {
@@ -101,57 +182,139 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
   return (
     <div className="h-full overflow-y-auto bg-slate-50 relative pb-32">
       
-      {/* 1. Confirm Modal (Elderly Friendly) */}
-      {confirmMed && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl animate-[fadeIn_0.2s_ease-out] flex flex-col items-center text-center">
-                <div className={`p-6 rounded-full mb-4 shadow-inner ${confirmMed.taken ? 'bg-slate-100 text-slate-400' : 'bg-pink-100 text-pink-600'}`}>
-                    {confirmMed.taken ? <X size={64} /> : <Pill size={64} />}
+      {/* 1. CAMERA MODAL (Taking the med) */}
+      {activeMedForCamera && (
+        <div className="fixed inset-0 z-[80] bg-black flex flex-col items-center justify-center">
+            <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
+                <div className="bg-black/50 px-4 py-2 rounded-full text-white font-bold backdrop-blur-md">
+                    {pendingPhoto ? 'ตรวจสอบความถูกต้อง' : `ถ่ายรูปยา: ${activeMedForCamera.commonName}`}
                 </div>
-
-                <h3 className="text-3xl font-bold text-slate-800 mb-2 leading-tight">
-                    {confirmMed.commonName || confirmMed.name}
-                </h3>
-                
-                <div className="bg-slate-50 p-6 rounded-3xl w-full my-4 border-2 border-slate-100">
-                     <p className="text-2xl text-slate-700 font-bold mb-2">
-                        {confirmMed.dosage}
-                     </p>
-                     <div className="flex items-center justify-center text-slate-500 text-lg">
-                        <Coffee className="mr-2" size={24}/>
-                        {confirmMed.instruction}
-                     </div>
-                </div>
-
-                <p className="text-slate-500 mb-6 text-xl">
-                    {confirmMed.taken 
-                        ? "จะยกเลิกว่ากินแล้วเหรอคะ?" 
-                        : "กินยานี้เรียบร้อยแล้วใช่มั้ยคะ?"}
-                </p>
-
-                <button 
-                    onClick={handleConfirmToggle}
-                    className={`w-full p-6 rounded-[1.5rem] font-bold text-2xl mb-3 shadow-xl active:scale-95 transition-all flex items-center justify-center ${
-                        confirmMed.taken 
-                        ? 'bg-slate-200 text-slate-600' 
-                        : 'bg-pink-500 text-white'
-                    }`}
-                >
-                    <CheckCircle className="mr-3" size={32} />
-                    {confirmMed.taken ? 'ยังไม่ได้กิน' : 'กินแล้วค่ะ'}
+                <button onClick={stopCamera} className="bg-white/20 p-3 rounded-full text-white backdrop-blur-md">
+                    <X size={24} />
                 </button>
+            </div>
+            
+            <div className="relative w-full h-full flex flex-col items-center justify-center">
+                {!pendingPhoto ? (
+                    <>
+                        <video 
+                            ref={videoRef} 
+                            autoPlay 
+                            playsInline 
+                            onLoadedMetadata={() => videoRef.current?.play()}
+                            className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 border-[3rem] border-black/50 pointer-events-none flex items-center justify-center">
+                            <div className="border-2 border-white/50 w-64 h-64 rounded-2xl animate-pulse"></div>
+                        </div>
+                        <div className="absolute bottom-10 w-full flex justify-center items-center gap-8">
+                             <button 
+                                onClick={capturePhoto}
+                                className="w-24 h-24 bg-white rounded-full border-8 border-slate-300 shadow-2xl active:scale-95 transition-transform flex items-center justify-center"
+                            >
+                                <Camera size={40} className="text-slate-400"/>
+                            </button>
+                        </div>
+                        <p className="absolute bottom-36 text-white font-bold text-lg shadow-black drop-shadow-md">แตะปุ่มสีขาวเพื่อถ่ายรูปยืนยัน</p>
+                    </>
+                ) : (
+                    // POST-CAPTURE / VERIFICATION STATE
+                    <div className="relative w-full h-full flex flex-col bg-slate-900">
+                        <img src={pendingPhoto} className="w-full h-1/2 object-cover opacity-80" alt="preview"/>
+                        
+                        <div className="flex-1 bg-white rounded-t-[2.5rem] -mt-10 relative z-20 p-6 flex flex-col items-center text-center">
+                            {isVerifying ? (
+                                <div className="flex flex-col items-center justify-center h-full">
+                                    <Loader2 size={64} className="text-pink-500 animate-spin mb-4"/>
+                                    <h3 className="text-2xl font-bold text-slate-700">AI กำลังตรวจสอบยา...</h3>
+                                    <p className="text-slate-400">รอสักครู่นะคะคนเก่ง</p>
+                                </div>
+                            ) : verificationResult ? (
+                                <div className="animate-fade-in w-full h-full flex flex-col">
+                                     <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${verificationResult.isMatch ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                         {verificationResult.isMatch ? <CheckCircle size={48}/> : <AlertTriangle size={48}/>}
+                                     </div>
+                                     
+                                     <h3 className={`text-2xl font-bold mb-2 ${verificationResult.isMatch ? 'text-green-700' : 'text-orange-700'}`}>
+                                         {verificationResult.isMatch ? 'ยาถูกต้องค่ะ!' : 'เอ๊ะ! ไม่ค่อยแน่ใจ?'}
+                                     </h3>
+                                     
+                                     <p className="text-slate-500 text-lg mb-6 bg-slate-50 p-4 rounded-xl">
+                                         "{verificationResult.reason}"
+                                     </p>
 
-                <button 
-                    onClick={() => setConfirmMed(null)}
-                    className="text-slate-400 text-lg font-bold py-4 px-8 rounded-full hover:bg-slate-100"
-                >
-                    ปิดหน้าต่าง
-                </button>
+                                     <div className="mt-auto space-y-3 w-full">
+                                         <button 
+                                            onClick={confirmTaken}
+                                            className={`w-full py-4 rounded-2xl font-bold text-xl text-white shadow-lg active:scale-95 transition-all flex items-center justify-center ${verificationResult.isMatch ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}`}
+                                         >
+                                             {verificationResult.isMatch ? <CheckCircle className="mr-2"/> : <AlertTriangle className="mr-2"/>}
+                                             {verificationResult.isMatch ? 'ยืนยัน (กินแล้ว)' : 'ยืนยัน (กินตัวนี้แหละ)'}
+                                         </button>
+                                         <button 
+                                            onClick={retryPhoto}
+                                            className="w-full py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-lg"
+                                         >
+                                             ถ่ายใหม่
+                                         </button>
+                                     </div>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
       )}
 
-      {/* 2. Vitals Modal */}
+      {/* 2. PHOTO VIEW MODAL (Checking history) */}
+      {viewingPhotoMed && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl flex flex-col items-center text-center">
+                <h3 className="text-2xl font-bold text-slate-800 mb-4">
+                    บันทึกการกินยา
+                </h3>
+                
+                <div className="w-full aspect-square bg-slate-100 rounded-2xl overflow-hidden mb-4 border-2 border-slate-200 relative">
+                    {viewingPhotoMed.takenPhoto ? (
+                        <img src={viewingPhotoMed.takenPhoto} alt="Proof" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                            <CheckCircle size={64} className="mb-2 text-green-500"/>
+                            <span>ไม่ได้ถ่ายรูปไว้</span>
+                        </div>
+                    )}
+                    <div className="absolute bottom-0 left-0 w-full bg-black/50 text-white py-1 text-sm">
+                        {viewingPhotoMed.takenTime ? viewingPhotoMed.takenTime.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) : ''} น.
+                    </div>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-xl w-full mb-6 border border-green-100">
+                     <p className="text-green-800 font-bold text-lg">
+                        กิน {viewingPhotoMed.commonName} เรียบร้อยแล้วค่ะ
+                     </p>
+                </div>
+
+                <div className="flex gap-3 w-full">
+                    <button 
+                        onClick={handleUndoTaken}
+                        className="flex-1 bg-red-100 text-red-600 p-4 rounded-2xl font-bold text-lg active:scale-95 transition-all flex items-center justify-center"
+                    >
+                        <RefreshCcw className="mr-2" size={20} />
+                        ยังไม่ได้กิน (ยกเลิก)
+                    </button>
+                    <button 
+                        onClick={() => setViewingPhotoMed(null)}
+                        className="flex-1 bg-slate-100 text-slate-600 p-4 rounded-2xl font-bold text-lg hover:bg-slate-200"
+                    >
+                        ปิด
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* 3. Vitals Modal */}
       {editingVital && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
             <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl">
@@ -211,7 +374,7 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
         </div>
       )}
 
-      {/* 3. Report Modal */}
+      {/* 4. Report Modal */}
       {reportText && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative">
@@ -253,7 +416,7 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
             <button 
                 onClick={() => {
                     onCheckIn();
-                    speakText("อรุณสวัสดิ์ค่ะ แจ้งเตือนลูกหลานเรียบร้อยแล้ว รับคะแนนสะสม 30 คะแนนค่ะ");
+                    speakText("อรุณสวัสดิ์ค่ะ แจ้งเตือนลูกหลานเรียบร้อยแล้ว");
                 }}
                 className="w-full mt-6 bg-gradient-to-r from-orange-400 to-amber-500 text-white p-6 rounded-[2rem] shadow-lg shadow-orange-200 flex items-center justify-between active:scale-95 transition-all animate-[pulse_3s_infinite]"
             >
@@ -348,7 +511,7 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
             {medications.map((med) => (
                 <div 
                 key={med.id} 
-                onClick={() => setConfirmMed(med)}
+                onClick={() => handleMedClick(med)}
                 className={`relative overflow-hidden group p-1 rounded-[2rem] transition-all cursor-pointer active:scale-[0.98] shadow-sm ${
                     med.taken ? 'bg-slate-100' : 'bg-white shadow-md hover:shadow-lg'
                 }`}
@@ -356,20 +519,29 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
                 <div className={`absolute left-0 top-0 bottom-0 w-3 ${med.taken ? 'bg-slate-300' : 'bg-pink-500'}`}></div>
                 <div className="flex items-center p-5 pl-6">
                     {/* Icon Status */}
-                    <div className={`mr-5 transition-all duration-300 ${med.taken ? 'scale-90 opacity-50' : 'scale-105'}`}>
+                    <div className={`mr-5 transition-all duration-300 flex-none ${med.taken ? 'scale-90' : 'scale-105'}`}>
                         {med.taken ? (
-                            <CheckCircle size={48} className="text-slate-400" />
+                            med.takenPhoto ? (
+                                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-green-400 shadow-sm relative">
+                                    <img src={med.takenPhoto} className="w-full h-full object-cover" alt="taken" />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                        <CheckCircle size={24} className="text-white drop-shadow-md"/>
+                                    </div>
+                                </div>
+                            ) : (
+                                <CheckCircle size={48} className="text-slate-400" />
+                            )
                         ) : (
-                            <div className="w-12 h-12 rounded-full border-4 border-pink-200 flex items-center justify-center bg-pink-50">
-                                <div className="w-6 h-6 bg-pink-500 rounded-full animate-pulse"></div>
+                            <div className="w-16 h-16 rounded-full border-4 border-pink-200 flex items-center justify-center bg-pink-50 text-pink-500">
+                                <Camera size={28} className="animate-pulse"/>
                             </div>
                         )}
                     </div>
 
                     {/* Info */}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1">
-                            <h3 className={`text-2xl font-bold leading-tight ${med.taken ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                            <h3 className={`text-2xl font-bold leading-tight truncate pr-2 ${med.taken ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
                                 {med.commonName || med.name}
                             </h3>
                             
@@ -380,7 +552,7 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
                                     const text = `ยา ${med.commonName || med.name}, กิน ${med.dosage}, ${med.instruction}, เวลา ${med.time}`;
                                     speakText(text);
                                 }}
-                                className="ml-2 bg-pink-100 text-pink-600 p-2 rounded-full active:scale-95 hover:bg-pink-200"
+                                className="ml-2 bg-pink-100 text-pink-600 p-2 rounded-full active:scale-95 hover:bg-pink-200 flex-none"
                             >
                                 <Volume2 size={24} />
                             </button>
@@ -396,10 +568,14 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
                             {med.dosage}
                         </p>
                         
-                        {!med.taken && (
+                        {!med.taken ? (
                             <div className="inline-flex items-center bg-slate-100 px-3 py-1.5 rounded-xl text-slate-600 font-bold text-sm">
                                 {med.time < "10:00" ? <Sun size={16} className="mr-1 text-orange-500"/> : med.time > "18:00" ? <Moon size={16} className="mr-1 text-purple-500"/> : <Coffee size={16} className="mr-1 text-brown-500"/>}
                                 {med.time} น. — {med.instruction}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-green-600 font-bold flex items-center">
+                                กินแล้ว {med.takenTime?.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.
                             </div>
                         )}
                     </div>

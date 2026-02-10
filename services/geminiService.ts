@@ -116,6 +116,50 @@ export const analyzeFoodImage = async (
   }
 };
 
+export const verifyPill = async (
+  base64Image: string,
+  medName: string,
+  appearance: string
+): Promise<{ isMatch: boolean; reason: string }> => {
+  try {
+    const modelId = 'gemini-3-flash-preview';
+    const prompt = `
+      Task: Verify if the medication in the image matches the expected description.
+      Expected Medication: "${medName}"
+      Expected Appearance: "${appearance}"
+      
+      Analyze the image carefully.
+      - If the image contains a pill/package that looks like the description, return true.
+      - If the image contains a completely different pill, or no pill, or is too blurry, return false.
+      
+      Output JSON ONLY:
+      {
+        "isMatch": boolean,
+        "reason": "Short explanation in Thai for an elderly person (e.g., 'สีและรูปร่างถูกต้องค่ะ' or 'รูปร่างไม่เหมือนยาเม็ดสีขาวเลยค่ะ')"
+      }
+    `;
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: modelId,
+      contents: {
+        parts: [
+          { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+          { text: prompt }
+        ]
+      },
+      config: { responseMimeType: 'application/json' }
+    });
+    
+    if (response.text) {
+        return JSON.parse(response.text);
+    }
+    return { isMatch: true, reason: "ระบบตรวจสอบไม่ได้ แต่บันทึกแล้วค่ะ" };
+  } catch (error) {
+    console.error("Gemini Verify Error:", error);
+    return { isMatch: true, reason: "ระบบตรวจสอบขัดข้อง (บันทึกปกติ)" }; // Fail safe
+  }
+};
+
 export const analyzeFaceHealth = async (base64Image: string): Promise<string> => {
   try {
     const modelId = 'gemini-3-flash-preview';

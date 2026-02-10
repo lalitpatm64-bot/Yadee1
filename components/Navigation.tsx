@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, MessageCircle, ScanFace, User, Sprout } from 'lucide-react';
+import { Home, MessageCircle, ScanFace, User } from 'lucide-react';
 import { ViewState } from '../types';
 import { speakText } from '../constants';
 
@@ -11,7 +11,6 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentView, setView }) => {
   const navItems: { id: ViewState; label: string; icon: React.ReactNode, voiceLabel: string }[] = [
     { id: 'home', label: 'กินยา', icon: <Home size={28} />, voiceLabel: 'หน้าหลัก กินยา' },
-    { id: 'garden', label: 'สวน', icon: <Sprout size={28} />, voiceLabel: 'สวนสุขภาพ' },
     { id: 'chat', label: 'คุยกับหมอ', icon: <MessageCircle size={28} />, voiceLabel: 'คุยกับหมอเอไอ' },
     { id: 'scan', label: 'สแกน', icon: <ScanFace size={28} />, voiceLabel: 'สแกนยาหรืออาหาร' },
     { id: 'profile', label: 'ตั้งค่า', icon: <User size={28} />, voiceLabel: 'ข้อมูลส่วนตัว' },

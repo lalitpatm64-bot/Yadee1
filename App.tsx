@@ -5,8 +5,7 @@ import ChatInterface from './components/ChatInterface';
 import ImageUploader from './components/ImageUploader';
 import ProfileView from './components/ProfileView';
 import SafetyNetSystem from './components/SafetyNetSystem';
-import GardenView from './components/GardenView';
-import { ViewState, ChatMessage, Medication, VitalSigns, GardenState } from './types';
+import { ViewState, ChatMessage, Medication, VitalSigns } from './types';
 import { INITIAL_MEDICATIONS, MOCK_USER, CAREGIVER_CONTACT } from './constants';
 import { Package, AlertTriangle, X, ShoppingBag, AlarmClock, PhoneOutgoing } from 'lucide-react';
 
@@ -22,13 +21,6 @@ const App: React.FC = () => {
     diastolic: 80,
     sugar: 105,
     lastUpdated: new Date()
-  });
-
-  // Garden State (Gamification)
-  const [garden, setGarden] = useState<GardenState>({
-    level: 1,
-    waterPoints: 10,
-    totalPlantsGrown: 0
   });
 
   // State for Low Stock Alert Modal
@@ -47,8 +39,7 @@ const App: React.FC = () => {
     setIsCheckedIn(true);
     setCheckInAlertLevel('idle');
     setAutoCallCountdown(null);
-    addGardenPoints(30); // Bonus points!
-    showToast("🌞 อรุณสวัสดิ์ค่ะ! รับ 30 คะแนน");
+    showToast("🌞 อรุณสวัสดิ์ค่ะ! วันนี้ขอให้สดใสนะคะ");
   };
 
   const simulateOversleep = () => {
@@ -89,42 +80,9 @@ const App: React.FC = () => {
         ...newVitals,
         lastUpdated: new Date()
     }));
-    // Also reward user for tracking vitals
-    addGardenPoints(10);
   };
 
-  const addGardenPoints = (points: number) => {
-     setGarden(prev => {
-         let newPoints = prev.waterPoints + points;
-         let newLevel = prev.level;
-         let newTotal = prev.totalPlantsGrown;
-
-         if (newPoints >= 100) {
-             if (newLevel < 5) {
-                 newLevel += 1;
-                 newPoints = newPoints - 100;
-                 showToast("🎉 ต้นไม้โตขึ้นแล้ว! (Level Up)");
-             } else {
-                 // Harvest logic
-                 newTotal += 1;
-                 newLevel = 1; // Reset to Seed
-                 newPoints = 0;
-                 showToast("🍎 เก็บเกี่ยวผลไม้สำเร็จ! เริ่มปลูกต้นใหม่นะ");
-             }
-         } else {
-             // Don't show toast if it comes from CheckIn (handled separately)
-             // But logic is fine.
-         }
-
-         return {
-             level: newLevel,
-             waterPoints: newPoints,
-             totalPlantsGrown: newTotal
-         };
-     });
-  };
-
-  const toggleMedication = (id: string) => {
+  const toggleMedication = (id: string, photo?: string) => {
     setMedications(prev => 
       prev.map(med => {
          if (med.id === id) {
@@ -143,15 +101,15 @@ const App: React.FC = () => {
                  setLowStockAlert({ ...med, totalQuantity: newQuantity });
              }
 
-             // Add Garden Points only when TAKING, not untaking
              if (isTaking) {
-                 addGardenPoints(20);
-                 showToast(`💧 รดน้ำต้นไม้ +20%`);
+                 showToast(`เก่งมากค่ะ! ทานยาเรียบร้อยแล้ว`);
              }
 
              return { 
                  ...med, 
                  taken: isTaking, 
+                 takenTime: isTaking ? new Date() : undefined,
+                 takenPhoto: isTaking && photo ? photo : undefined, // Save proof
                  alertLevel: isTaking ? 0 : med.alertLevel,
                  totalQuantity: newQuantity
              };
@@ -225,8 +183,6 @@ const App: React.FC = () => {
             onSaveVoice={setCustomVoiceUrl}
           />
         );
-      case 'garden':
-        return <GardenView garden={garden} />;
       default:
         return <div>View not found</div>;
     }
