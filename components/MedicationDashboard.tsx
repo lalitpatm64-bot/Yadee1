@@ -50,7 +50,13 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
   // --- CAMERA LOGIC ---
   const startCamera = async (med: Medication) => {
       try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment',
+                width: { ideal: 1280 }, // Limit resolution request
+                height: { ideal: 720 }
+            } 
+          });
           setCameraStream(stream);
           setActiveMedForCamera(med);
           setVerificationResult(null);
@@ -75,11 +81,23 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
 
   const capturePhoto = async () => {
       if (videoRef.current && activeMedForCamera) {
+          // PERFORMANCE TUNING: Resize image to max 800px width
+          const MAX_WIDTH = 800;
+          const videoWidth = videoRef.current.videoWidth;
+          const videoHeight = videoRef.current.videoHeight;
+          const scale = Math.min(1, MAX_WIDTH / videoWidth);
+
           const canvas = document.createElement('canvas');
-          canvas.width = videoRef.current.videoWidth;
-          canvas.height = videoRef.current.videoHeight;
-          canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-          const photoBase64 = canvas.toDataURL('image/jpeg', 0.5);
+          canvas.width = videoWidth * scale;
+          canvas.height = videoHeight * scale;
+          
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+             ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          }
+          
+          // Use slightly lower quality for faster upload (0.7 is still very good)
+          const photoBase64 = canvas.toDataURL('image/jpeg', 0.7);
           const base64Data = photoBase64.split(',')[1];
 
           setPendingPhoto(photoBase64);
@@ -176,7 +194,7 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
   const getSugarColor = (sugar: number) => {
       if (sugar > 125) return 'from-red-50 to-red-100 text-red-800 border-red-200'; 
       if (sugar > 100) return 'from-orange-50 to-orange-100 text-orange-800 border-orange-200'; 
-      return 'from-blue-50 to-blue-100 text-blue-800 border-blue-200'; 
+      return 'from-green-50 to-green-100 text-green-800 border-green-200'; 
   };
 
   return (
@@ -357,7 +375,7 @@ const MedicationDashboard: React.FC<Props> = ({ user, medications, vitals, onUpd
                                 type="number" 
                                 value={tempSugar}
                                 onChange={(e) => setTempSugar(e.target.value)}
-                                className="w-full p-6 bg-slate-50 rounded-3xl text-4xl font-bold text-center border-2 border-slate-200 focus:border-blue-500 focus:outline-none"
+                                className="w-full p-6 bg-slate-50 rounded-3xl text-4xl font-bold text-center border-2 border-slate-200 focus:border-green-500 focus:outline-none"
                             />
                         </div>
                     )}

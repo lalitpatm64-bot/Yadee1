@@ -11,17 +11,19 @@ export const sendChatMessage = async (
   newMessage: string
 ): Promise<string> => {
   try {
-    // Using gemini-3-flash-preview for fast, responsive text interactions
     const modelId = 'gemini-3-flash-preview';
     
-    const chatHistoryContext = history
+    // OPTIMIZATION: Limit history to last 6 messages
+    const recentHistory = history.slice(-6);
+    
+    const chatHistoryContext = recentHistory
       .map(msg => `${msg.role === 'user' ? 'User' : 'Model'}: ${msg.text}`)
       .join('\n');
 
     const prompt = `
       ${SYSTEM_INSTRUCTION}
       
-      Previous conversation:
+      Previous conversation (last 6 messages):
       ${chatHistoryContext}
       
       User: ${newMessage}
@@ -45,7 +47,8 @@ export const analyzeMedicalImage = async (
   userPrompt: string = "ช่วยดูยาตัวนี้ให้หน่อยค่ะ ว่าคือยาอะไร และต้องกินยังไง"
 ): Promise<string> => {
   try {
-    const modelId = 'gemini-3-flash-preview';
+    // Use gemini-2.0-flash-exp for reliable vision analysis
+    const modelId = 'gemini-2.0-flash-exp';
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
@@ -76,7 +79,8 @@ export const analyzeFoodImage = async (
   userProfile: UserProfile
 ): Promise<string> => {
   try {
-    const modelId = 'gemini-3-flash-preview';
+    // Use gemini-2.0-flash-exp for reliable vision analysis
+    const modelId = 'gemini-2.0-flash-exp';
 
     const prompt = `
       Role: Nutritionist for elderly patient.
@@ -122,7 +126,8 @@ export const verifyPill = async (
   appearance: string
 ): Promise<{ isMatch: boolean; reason: string }> => {
   try {
-    const modelId = 'gemini-3-flash-preview';
+    // Use gemini-2.0-flash-exp for reliable vision analysis
+    const modelId = 'gemini-2.0-flash-exp';
     const prompt = `
       Task: Verify if the medication in the image matches the expected description.
       Expected Medication: "${medName}"
@@ -162,7 +167,8 @@ export const verifyPill = async (
 
 export const analyzeFaceHealth = async (base64Image: string): Promise<string> => {
   try {
-    const modelId = 'gemini-3-flash-preview';
+    // Use gemini-2.0-flash-exp for reliable vision analysis
+    const modelId = 'gemini-2.0-flash-exp';
 
     const prompt = `
       Role: Friendly AI Health Companion.

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, X, Loader2, Pill, Utensils, Smile, Zap, Droplets, Sparkles, Volume2 } from 'lucide-react';
+import { Camera, Upload, X, Loader2, Pill, Utensils, Smile, Zap, Droplets, Sparkles, Volume2, Scan, RefreshCcw } from 'lucide-react';
 import { analyzeMedicalImage, analyzeFoodImage, analyzeFaceHealth } from '../services/geminiService';
 import { MOCK_USER, speakText } from '../constants';
 
@@ -18,16 +18,47 @@ const ImageUploader: React.FC = () => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [faceMetrics, setFaceMetrics] = useState<FaceMetrics | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<ScanMode>('face'); // Default to the new cool feature
+  const [mode, setMode] = useState<ScanMode>('face');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // More aggressive resizing to prevent browser memory issues
+  const resizeImage = (base64Str: string, maxWidth: number = 600): Promise<string> => {
+      return new Promise((resolve) => {
+          const img = new Image();
+          img.src = base64Str;
+          img.onload = () => {
+              // Calculate new dimensions
+              const scale = Math.min(1, maxWidth / img.width);
+              const newWidth = img.width * scale;
+              const newHeight = img.height * scale;
+
+              const canvas = document.createElement('canvas');
+              canvas.width = newWidth;
+              canvas.height = newHeight;
+              
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                  ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                  // Use lower quality (0.6) for faster transmission
+                  resolve(canvas.toDataURL('image/jpeg', 0.6)); 
+              } else {
+                  resolve(base64Str); // Fallback
+              }
+          };
+          img.onerror = () => resolve(base64Str);
+      });
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64String = reader.result as string;
-        const base64Data = base64String.split(',')[1];
+        // Optimization: Resize image before setting state
+        const resizedBase64 = await resizeImage(base64String, 600);
+        const base64Data = resizedBase64.split(',')[1];
+        
         setImage(base64Data);
         setAnalysis(null);
         setFaceMetrics(null);
@@ -41,28 +72,38 @@ const ImageUploader: React.FC = () => {
     setLoading(true);
     speakText("กำลังวิเคราะห์รูปภาพ รอสักครู่นะคะ");
     
-    if (mode === 'medication') {
-        const result = await analyzeMedicalImage(image);
-        setAnalysis(result);
-        speakText("วิเคราะห์เสร็จแล้วค่ะ กดปุ่มลำโพงเพื่อฟังผลได้เลย");
-    } else if (mode === 'food') {
-        const result = await analyzeFoodImage(image, MOCK_USER);
-        setAnalysis(result);
-        speakText("วิเคราะห์อาหารเสร็จแล้วค่ะ");
-    } else if (mode === 'face') {
-        const jsonResult = await analyzeFaceHealth(image);
-        try {
-            // Clean up potentially messy JSON string
-            const cleanJson = jsonResult.replace(/```json/g, '').replace(/```/g, '').trim();
-            const metrics = JSON.parse(cleanJson);
-            setFaceMetrics(metrics);
-            speakText(`คุณยายดูสดใสจังเลยค่ะ ${metrics.compliment}`);
-        } catch (e) {
-            setAnalysis("ขออภัยค่ะ ไม่สามารถประมวลผลใบหน้าได้ ลองถ่ายใหม่นะคะ");
+    // Add timeout to prevent infinite loading
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout")), 15000)
+    );
+
+    try {
+        if (mode === 'medication') {
+            const result = await Promise.race([analyzeMedicalImage(image), timeoutPromise]) as string;
+            setAnalysis(result);
+            speakText("วิเคราะห์เสร็จแล้วค่ะ กดปุ่มลำโพงเพื่อฟังผลได้เลย");
+        } else if (mode === 'food') {
+            const result = await Promise.race([analyzeFoodImage(image, MOCK_USER), timeoutPromise]) as string;
+            setAnalysis(result);
+            speakText("วิเคราะห์อาหารเสร็จแล้วค่ะ");
+        } else if (mode === 'face') {
+            const jsonResult = await Promise.race([analyzeFaceHealth(image), timeoutPromise]) as string;
+            try {
+                const cleanJson = jsonResult.replace(/```json/g, '').replace(/```/g, '').trim();
+                const metrics = JSON.parse(cleanJson);
+                setFaceMetrics(metrics);
+                speakText(`คุณยายดูสดใสจังเลยค่ะ ${metrics.compliment}`);
+            } catch (e) {
+                setAnalysis("ขออภัยค่ะ ไม่สามารถประมวลผลใบหน้าได้ ลองถ่ายใหม่นะคะ");
+            }
         }
+    } catch (error) {
+        console.error("Analysis failed:", error);
+        setAnalysis("ขออภัยค่ะ ระบบใช้เวลานานเกินไป โปรดลองถ่ายใหม่อีกครั้งให้ชัดเจนขึ้นนะคะ");
+        speakText("ระบบใช้เวลานานเกินไป ลองถ่ายใหม่นะคะ");
+    } finally {
+        setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const clearImage = () => {
@@ -128,10 +169,10 @@ const ImageUploader: React.FC = () => {
                 />
                 {/* Overlay Scan Effect when Loading */}
                 {loading && (
-                    <div className="absolute inset-0 bg-black/30 z-10">
-                        <div className="w-full h-1 bg-white/80 shadow-[0_0_15px_rgba(255,255,255,1)] absolute top-0 animate-[scan_2s_infinite_linear]"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-white font-mono text-xl animate-pulse">AI ANALYZING...</div>
+                    <div className="absolute inset-0 bg-black/30 z-10 flex flex-col items-center justify-center">
+                        <Loader2 className="text-white w-16 h-16 animate-spin mb-4" />
+                        <div className="bg-white/90 px-6 py-2 rounded-full text-slate-800 font-bold animate-pulse">
+                            กำลังวิเคราะห์...
                         </div>
                     </div>
                 )}
@@ -183,11 +224,11 @@ const ImageUploader: React.FC = () => {
                         {loading ? (
                             <>
                                 <Loader2 className="mr-2 animate-spin" size={28} />
-                                ระบบกำลังประมวลผล...
+                                รอสักครู่...
                             </>
                         ) : (
                             <>
-                                <Sparkles className="mr-2" size={28} />
+                                <Scan className="mr-2" size={28} />
                                 เริ่มวิเคราะห์
                             </>
                         )}
@@ -267,8 +308,8 @@ const ImageUploader: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <button onClick={clearImage} className="w-full mt-4 py-3 text-slate-500 font-medium hover:text-slate-700">
-                    สแกนใหม่อีกครั้ง
+                <button onClick={clearImage} className="w-full mt-4 py-3 text-slate-500 font-medium hover:text-slate-700 bg-white rounded-2xl shadow-sm flex items-center justify-center">
+                    <RefreshCcw className="mr-2" size={20}/> สแกนใหม่อีกครั้ง
                 </button>
             </div>
         )}
@@ -288,8 +329,8 @@ const ImageUploader: React.FC = () => {
             <div className="text-lg text-slate-700 whitespace-pre-line leading-relaxed">
                 {analysis}
             </div>
-            <button onClick={clearImage} className="w-full mt-6 bg-slate-100 py-3 rounded-xl font-bold text-slate-600">
-                    ตกลง / สแกนใหม่
+            <button onClick={clearImage} className="w-full mt-6 bg-slate-100 py-3 rounded-xl font-bold text-slate-600 flex items-center justify-center">
+                   <RefreshCcw className="mr-2" size={20}/> ตกลง / สแกนใหม่
             </button>
             </div>
         )}
